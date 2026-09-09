@@ -159,11 +159,6 @@ EXTRA_CSS = """
 .pager a:hover { color:var(--rust); }
 .pager .dir { display:block; color:var(--ink-3); letter-spacing:.12em;
               text-transform:uppercase; font-size:10px; margin-bottom:4px; }
-.todo { border:1px dashed var(--rust); padding:18px 20px; margin:22px 0;
-        font-family:var(--f-data); font-size:13px; line-height:1.7;
-        color:var(--ink-2); }
-.todo b { color:var(--rust); display:block; margin-bottom:6px;
-          letter-spacing:.1em; text-transform:uppercase; font-size:11px; }
 @media (max-width:700px) {
   .indexlist a.row { grid-template-columns:2rem 1fr; }
   .indexlist .tag { display:none; }

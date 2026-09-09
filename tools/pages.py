@@ -732,6 +732,10 @@ def findings_index_body():
     )
 
 
+# TODO, needs Jonathan: the Principal block below is deliberately generic.
+# It should carry his name, years in the industry, the operators or funds he
+# has worked for, the basins and commodities actually modelled, and his
+# qualifications. Two paragraphs and a photograph.
 ABOUT_BODY = """
   <section class="thesis article">
     <div class="crumb">About &middot; Who does the work</div>
@@ -746,13 +750,6 @@ ABOUT_BODY = """
   <div class="block">
     <div class="rail"><b>Principal</b><span>Who does the work</span></div>
     <div class="col prose">
-      <div class="todo">
-        <b>Needs your copy</b>
-        This section is a placeholder. It should carry your name, your years in
-        the industry, the operators or funds you have worked for, the basins and
-        commodities you have actually modelled, and your qualifications. Two
-        paragraphs is enough. A photograph helps more than another paragraph.
-      </div>
       <p>
         Gossans is led by a single principal, and the person who scopes an
         engagement is the person who builds the model and presents the finding.
@@ -801,6 +798,9 @@ ABOUT_BODY = """
   </div>
 """
 
+# TODO, needs Jonathan: a direct booking link beside the email address, plus
+# a phone number and a city. Buyers of technical work check that a firm is
+# somewhere real, and a booking link removes a round trip.
 CONTACT_BODY = """
   <section class="thesis article">
     <div class="crumb">Contact &middot; Scoping call</div>
@@ -823,14 +823,6 @@ CONTACT_BODY = """
       <p style="margin-top:24px;">
         <a class="btn" href="mailto:hello@gossans.com?subject=Scoping%20call">hello@gossans.com</a>
       </p>
-      <div class="todo">
-        <b>Worth adding</b>
-        A direct booking link removes a round trip and typically doubles the
-        number of calls that actually happen. Send me the link from whichever
-        scheduling tool you prefer and I will put it here beside the email
-        address. A phone number and a city also help, because buyers of technical
-        work check that a firm is somewhere real.
-      </div>
     </div>
   </div>
 
