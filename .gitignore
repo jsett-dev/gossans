@@ -15,3 +15,7 @@ dist/
 
 # Cloudflare
 .wrangler/
+
+# Python
+__pycache__/
+*.pyc
