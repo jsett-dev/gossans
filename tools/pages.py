@@ -732,10 +732,10 @@ def findings_index_body():
     )
 
 
-# TODO, needs Jonathan: the Principal block below is deliberately generic.
-# It should carry his name, years in the industry, the operators or funds he
-# has worked for, the basins and commodities actually modelled, and his
-# qualifications. Two paragraphs and a photograph.
+# TODO, needs Jonathan: the page states only what he has confirmed. Still to
+# come, and each one is worth real money on a page a lender reads: employers or
+# clients he is willing to name, the basins and assets actually modelled, any
+# professional registration, a city, and a photograph.
 ABOUT_BODY = """
   <section class="thesis article">
     <div class="crumb">About &middot; Who does the work</div>
@@ -751,13 +751,47 @@ ABOUT_BODY = """
     <div class="rail"><b>Principal</b><span>Who does the work</span></div>
     <div class="col prose">
       <p>
-        Gossans is led by a single principal, and the person who scopes an
-        engagement is the person who builds the model and presents the finding.
-        Nothing is handed to an analyst you have not met.
+        Gossans is led by <b>Jonathan Settelmeyer</b>, who holds a Bachelor of
+        Science in Petroleum Engineering from the University of Wyoming, with a
+        concentration in unconventional resources, taken in 2018.
       </p>
       <p>
-        That is a deliberate constraint on how much work we take. It is also the
+        That concentration is where most of this site comes from. Hyperbolic
+        decline behaviour, the gap between a fit to per-well rate and a fit to
+        field rate, and the reason a type curve entered on the wrong basis stays
+        wrong for the life of a forecast are not incidental interests here. They
+        are the subject.
+      </p>
+      <p>
+        The person who takes the scoping call is the person who builds the model
+        and presents the finding. Nothing is handed to an analyst you have not
+        met. That is a deliberate limit on how much work we take, and it is the
         reason a two-week engagement is two weeks rather than a quarter.
+      </p>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="rail"><b>Range</b><span>Why this many commodities</span></div>
+    <div class="col prose">
+      <p>
+        The commodity list on this site looks broad for a single practice. It is
+        close to the list one state produces, and it is the state this practice
+        was trained in.
+      </p>
+      <p>
+        Wyoming is the largest coal producer in the United States and its largest
+        uranium producer. It mines the world's largest trona deposit, separates
+        helium out of its own declining gas streams, holds one of the few
+        advanced rare earth projects in the country, and produces oil and gas
+        across the Powder River and Green River basins. Those assets share
+        regulators, a labour market and frequently an owner, which makes the
+        comparison between them a practical question rather than an academic one.
+      </p>
+      <p>
+        The arithmetic of extraction economics is the same in every one of those
+        cases. What differs is the physics feeding it, and the engine carries
+        that difference explicitly rather than averaging it away.
       </p>
     </div>
   </div>
@@ -913,8 +947,9 @@ def build_pages():
         "url": "/about/",
         "title": "About Gossans",
         "description": (
-            "Who does the work, why independence matters when a model disagrees with "
-            "yours, and how client data is handled."
+            "Gossans is led by Jonathan Settelmeyer, a University of Wyoming petroleum "
+            "engineer. Who does the work, why independence matters when a model "
+            "disagrees with yours, and how client data is handled."
         ),
         "kicker": "Who does the work",
         "priority": "0.9",
