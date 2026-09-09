@@ -1,4 +1,4 @@
-# gossanadvisory.com
+# www.gossans.com
 
 The Gossan Advisory website. One static page, no build step, no dependencies.
 
@@ -68,19 +68,38 @@ Cloudflare too, this is the least moving parts of any option.
 set up for it. Point the domain with these records at your registrar:
 
 ```
+CNAME www  <your-github-username>.github.io
 A     @    185.199.108.153
 A     @    185.199.109.153
 A     @    185.199.110.153
 A     @    185.199.111.153
-CNAME www  <your-github-username>.github.io
 ```
 
 Tick "Enforce HTTPS" once the certificate is issued, which takes up to an hour.
 
+### Why www is the canonical host
+
+`CNAME` holds `www.gossans.com`, not the bare domain, and every canonical tag,
+Open Graph URL and sitemap entry agrees with it. The apex records above exist so
+that `gossans.com` resolves and redirects to the www host rather than failing.
+
+This is a deliberate choice and worth keeping. A bare apex cannot hold a CNAME
+record under the DNS specification, so pointing it at a host means hard-coding
+that host's IP addresses, which then break silently whenever the provider
+changes them. A www host is a CNAME, so moving between Cloudflare, GitHub and
+Netlify later is a one-record change. It also keeps cookies off the apex, which
+matters the day a subdomain gets added for anything else.
+
+Pick one host and never serve both. Two hosts serving identical content splits
+search ranking between them and is the most common self-inflicted SEO problem
+for a small site.
+
 ## Before launch
 
-- [ ] Register `gossanadvisory.com`, and `gossanpartners.com` alongside it
-- [ ] Create the `hello@gossanadvisory.com` mailbox the contact button points to
+- [ ] Register `gossans.com`
+- [ ] Register `gossanadvisory.com` and point it at this site as a redirect,
+      because anyone who hears the firm's name will type that first
+- [ ] Create the `hello@gossans.com` mailbox the contact button points to
 - [ ] Run a USPTO wordmark search for Gossan, as Gossan Resources trades in Canada
 - [ ] Add `og-image.png` at 1200x630 and reference it in the head, or social
       shares will render as a bare link
