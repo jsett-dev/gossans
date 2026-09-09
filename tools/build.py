@@ -116,7 +116,7 @@ FOOT = """
   </div>
 
   <footer class="colophon">
-    <span>Gossans &middot; Extraction economics and production optimisation</span>
+    <span>Gossans &middot; Production outlook simulation and opportunity screening</span>
     <button class="theme-btn" type="button" id="theme">Light / dark</button>
   </footer>
 
@@ -179,7 +179,7 @@ def render(page):
         fonts=FONTS,
         style=STYLE + EXTRA_CSS,
         schema=schema,
-        kicker=page.get("kicker", "Extraction economics &amp; production optimisation"),
+        kicker=page.get("kicker", "Production outlook simulation &amp; screening"),
     )
     return head + page["body"] + FOOT.format(script=SCRIPT)
 

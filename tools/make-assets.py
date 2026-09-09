@@ -114,7 +114,7 @@ def write_og_image() -> None:
     draw.line([(left, 420), (width - left, 420)], fill=RULE, width=2)
 
     tracked(draw, (left, 452),
-            "EXTRACTION ECONOMICS & PRODUCTION OPTIMISATION",
+            "PRODUCTION OUTLOOK SIMULATION & OPPORTUNITY SCREENING",
             label, DRAFT, spacing=2.4)
 
     draw.text((left, 508),

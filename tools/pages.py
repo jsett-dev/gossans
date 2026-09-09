@@ -964,7 +964,7 @@ ORG_SCHEMA = """{
   "@type": "ProfessionalService",
   "name": "Gossans",
   "url": "https://www.gossans.com/",
-  "description": "Fixed-fee extraction economics and production optimisation. Assets rebuilt as one auditable economic model, fitted to outturn, with opportunities ranked on risked value.",
+  "description": "Fixed-fee production outlook simulation and opportunity screening. Assets simulated on one basis, fitted to outturn, with every option ranked on risked value.",
   "founder": {
     "@type": "Person",
     "name": "Jonathan Settelmeyer",
@@ -1041,7 +1041,8 @@ def build_pages():
         "title": "Contact Gossans",
         "description": (
             "A forty-five minute scoping call at no charge, followed by a written "
-            "fixed-fee scope. Extraction economics from Gillette, Wyoming. Nothing is "
+            "fixed-fee scope. Production outlook simulation and screening from Gillette, "
+            "Wyoming. Nothing is "
             "requested until both are agreed."
         ),
         "kicker": "Gillette, Wyoming",
