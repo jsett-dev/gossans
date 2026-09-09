@@ -1,0 +1,7 @@
+# Keep line endings deterministic across machines and deploy targets.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
