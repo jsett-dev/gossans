@@ -1,0 +1,1178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gossan Advisory</title>
+<meta name="description" content="Fixed-fee extraction economics. We rebuild your assets as one auditable model, fit it to what they actually produced, and rank what to do next with a price and a probability on every line.">
+<link rel="canonical" href="https://gossanadvisory.com/">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Gossan Advisory">
+<meta property="og:url" content="https://gossanadvisory.com/">
+<meta property="og:title" content="Gossan Advisory">
+<meta property="og:description" content="Your production data already holds the answer. It is usually being read wrong. Fixed-fee extraction economics for operators, private capital and lenders.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Gossan Advisory">
+<meta name="twitter:description" content="Fixed-fee extraction economics. We find the value your model is not showing you.">
+
+<meta name="theme-color" content="#f1f2ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14181a" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+:root {
+  color-scheme: light;
+
+  /* Vellum ground, drafting ink, red-pencil markup. */
+  --paper:      #f1f2ef;
+  --paper-2:    #e9ebe6;
+  --paper-3:    #dfe2dc;
+  --ink:        #14181a;
+  --ink-2:      #444b4d;
+  --ink-3:      #6d7573;
+  --rule:       #c7ccc5;
+  --rule-soft:  #d9ddd6;
+  --draft:      #22506b;   /* diluted drafting ink */
+  --draft-soft: #dde6ec;
+  --redline:    #a3301f;   /* the correction pencil */
+  --redline-soft: #f0dcd8;
+  --good:       #2f6b46;
+
+  --shadow: 0 1px 0 var(--rule);
+
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper:      #14181a;
+    --paper-2:    #1b2022;
+    --paper-3:    #232a2c;
+    --ink:        #e8eae5;
+    --ink-2:      #b3bab8;
+    --ink-3:      #838c8a;
+    --rule:       #2d3538;
+    --rule-soft:  #232a2c;
+    --draft:      #6ba3c6;
+    --draft-soft: #1c2c36;
+    --redline:    #dd7361;
+    --redline-soft: #33201d;
+    --good:       #6fb98a;
+    --shadow: 0 1px 0 var(--rule);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper:      #14181a;
+  --paper-2:    #1b2022;
+  --paper-3:    #232a2c;
+  --ink:        #e8eae5;
+  --ink-2:      #b3bab8;
+  --ink-3:      #838c8a;
+  --rule:       #2d3538;
+  --rule-soft:  #232a2c;
+  --draft:      #6ba3c6;
+  --draft-soft: #1c2c36;
+  --redline:    #dd7361;
+  --redline-soft: #33201d;
+  --good:       #6fb98a;
+  --shadow: 0 1px 0 var(--rule);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sheet {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0 32px 96px;
+}
+
+/* ---------- drafting annotation rail ---------- */
+
+.block {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 0 40px;
+  padding: 52px 0;
+  border-top: 1px solid var(--rule);
+}
+.block:first-of-type { border-top: none; }
+
+.rail {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  line-height: 1.7;
+  padding-top: 6px;
+}
+.rail b {
+  display: block;
+  color: var(--draft);
+  font-weight: 600;
+}
+.rail span { display: block; }
+
+.col { min-width: 0; }
+.prose { max-width: 66ch; }
+
+/* ---------- type ---------- */
+
+h1, h2, h3 {
+  font-family: var(--f-display);
+  text-wrap: balance;
+  margin: 0;
+}
+h2 {
+  font-size: clamp(26px, 3.2vw, 34px);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.12;
+  margin-bottom: 14px;
+}
+h3 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.005em;
+  margin-bottom: 4px;
+}
+p { margin: 0 0 16px; }
+p:last-child { margin-bottom: 0; }
+.lede { font-size: 19px; line-height: 1.55; color: var(--ink-2); }
+strong { font-weight: 600; }
+em { font-style: italic; color: var(--ink-2); }
+
+.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+
+/* ---------- nameplate ---------- */
+
+header.plate { padding: 44px 0 0; }
+
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.wordmark .sq {
+  width: 13px;
+  height: 13px;
+  background: var(--redline);
+  align-self: center;
+  flex: none;
+}
+.wordmark .name {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: clamp(30px, 4vw, 42px);
+  letter-spacing: -.035em;
+  line-height: 1;
+}
+.wordmark .suffix {
+  font-family: var(--f-display);
+  font-weight: 500;
+  font-size: clamp(19px, 2.4vw, 25px);
+  letter-spacing: -.01em;
+  color: var(--ink-2);
+  margin-left: -4px;
+}
+.wordmark .kicker {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--draft);
+}
+
+.titleblock {
+  margin-top: 26px;
+  border: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--paper-2);
+}
+.titleblock div {
+  padding: 12px 16px;
+  border-left: 1px solid var(--rule);
+  font-family: var(--f-data);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.titleblock div:first-child { border-left: none; }
+.titleblock dt {
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 4px;
+}
+
+/* ---------- thesis ---------- */
+
+.thesis {
+  padding: 64px 0 60px;
+  border-bottom: 1px solid var(--rule);
+}
+.thesis h1 {
+  font-size: clamp(34px, 5.4vw, 60px);
+  font-weight: 800;
+  letter-spacing: -.038em;
+  line-height: 1.02;
+  max-width: 20ch;
+}
+.thesis h1 .mark {
+  color: var(--redline);
+  text-decoration: underline;
+  text-decoration-color: var(--redline);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+.thesis .lede { margin-top: 26px; max-width: 62ch; }
+
+.proof {
+  margin-top: 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  border-top: 1px solid var(--rule);
+}
+.proof > div {
+  padding: 18px 20px 16px 0;
+  border-right: 1px solid var(--rule-soft);
+}
+.proof > div:last-child { border-right: none; }
+.proof .fig {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: -.03em;
+  color: var(--draft);
+  font-variant-numeric: tabular-nums;
+}
+.proof .cap {
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+/* ---------- services ledger ---------- */
+
+.ledger { border-top: 1px solid var(--rule); }
+
+.svc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px 150px;
+  gap: 0 28px;
+  padding: 22px 8px 22px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  align-items: start;
+  transition: background .12s ease;
+}
+.svc:hover { background: var(--paper-2); }
+.svc .desc { font-size: 15.5px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; }
+.svc .meta {
+  font-family: var(--f-data);
+  font-size: 12px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  padding-top: 4px;
+}
+.svc .fee {
+  font-family: var(--f-data);
+  font-size: 19px;
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  padding-top: 1px;
+}
+.svc .fee small {
+  display: block;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 400;
+  margin-top: 3px;
+}
+.svc.lead { background: var(--draft-soft); padding-left: 16px; margin-left: -16px; }
+.svc.lead:hover { background: var(--draft-soft); }
+.tag {
+  display: inline-block;
+  font-family: var(--f-data);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--draft);
+  border: 1px solid var(--draft);
+  padding: 1px 6px;
+  margin-left: 8px;
+  vertical-align: 2px;
+}
+
+/* ---------- data request ---------- */
+
+.two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 34px;
+}
+.list { list-style: none; margin: 0; padding: 0; }
+.list li {
+  padding: 9px 0 9px 0;
+  border-bottom: 1px dotted var(--rule);
+  font-size: 15.5px;
+  line-height: 1.5;
+}
+.list li:last-child { border-bottom: none; }
+.list .src {
+  display: block;
+  font-family: var(--f-data);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  letter-spacing: .02em;
+  margin-top: 3px;
+}
+.sublabel {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--draft);
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* ---------- worked example ---------- */
+
+.case { border: 1px solid var(--rule); background: var(--paper-2); }
+.case-head {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.case-head .who { font-family: var(--f-display); font-weight: 700; font-size: 17px; }
+.case-head .note {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 0 16px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.step:last-child { border-bottom: none; }
+.step .n {
+  font-family: var(--f-data);
+  font-size: 12px;
+  color: var(--draft);
+  padding-top: 3px;
+  font-weight: 500;
+}
+.step h3 { margin-bottom: 6px; }
+.step p { font-size: 15.5px; color: var(--ink-2); margin-bottom: 0; }
+.step .out {
+  margin-top: 10px;
+  font-family: var(--f-data);
+  font-size: 13px;
+  line-height: 1.75;
+  background: var(--paper-3);
+  border-left: 2px solid var(--draft);
+  padding: 10px 14px;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--ink-2);
+}
+.step .out b { color: var(--ink); font-weight: 600; }
+
+/* ---------- redline findings ---------- */
+
+.redlines { border-top: 1px solid var(--rule); }
+.rl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 0 28px;
+  padding: 18px 0 18px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+  position: relative;
+}
+.rl::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 22px;
+  width: 8px; height: 8px;
+  background: var(--redline);
+}
+.rl h3 { font-size: 16px; }
+.rl p { font-size: 15px; color: var(--ink-2); margin: 4px 0 0; }
+.rl .cost {
+  font-family: var(--f-data);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--redline);
+  background: var(--redline-soft);
+  padding: 8px 12px;
+  align-self: start;
+}
+
+/* ---------- process ---------- */
+
+.flow { counter-reset: s; display: grid; gap: 0; }
+.flow li {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 0 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.flow li::before {
+  counter-increment: s;
+  content: counter(s, decimal-leading-zero);
+  font-family: var(--f-data);
+  font-size: 13px;
+  color: var(--draft);
+  padding-top: 3px;
+}
+.flow p { font-size: 15.5px; color: var(--ink-2); margin: 4px 0 0; }
+.flow .when {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-left: 10px;
+}
+
+/* ---------- boundaries ---------- */
+
+.bounds { display: grid; gap: 10px; }
+.bounds div {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 15.5px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.bounds .x { color: var(--redline); font-family: var(--f-data); }
+
+/* ---------- contact ---------- */
+
+.cta {
+  border: 1px solid var(--ink);
+  background: var(--paper-2);
+  padding: 34px 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: center;
+}
+.cta h2 { margin-bottom: 8px; }
+.cta p { color: var(--ink-2); font-size: 16px; max-width: 52ch; }
+.cta a.btn {
+  font-family: var(--f-data);
+  font-size: 13px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--paper);
+  background: var(--ink);
+  padding: 15px 26px;
+  border: 1px solid var(--ink);
+  white-space: nowrap;
+  display: inline-block;
+  transition: background .12s ease, color .12s ease;
+}
+.cta a.btn:hover { background: var(--draft); border-color: var(--draft); color: #fff; }
+
+a { color: var(--draft); text-underline-offset: 2px; }
+a:focus-visible, .btn:focus-visible, button:focus-visible {
+  outline: 2px solid var(--redline);
+  outline-offset: 2px;
+}
+
+footer.colophon {
+  border-top: 1px solid var(--rule);
+  margin-top: 8px;
+  padding: 24px 0 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-family: var(--f-data);
+  font-size: 11.5px;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.theme-btn {
+  font: inherit;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid var(--rule);
+  color: var(--ink-3);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.theme-btn:hover { color: var(--ink); border-color: var(--ink-3); }
+
+@media (max-width: 900px) {
+  .block { grid-template-columns: 1fr; gap: 14px; padding: 40px 0; }
+  .rail { padding-top: 0; }
+  .rail b { display: inline; }
+  .rail span { display: inline; margin-left: 10px; }
+  .titleblock { grid-template-columns: repeat(2, 1fr); }
+  .titleblock div:nth-child(3) { border-left: none; }
+  .titleblock div:nth-child(n+3) { border-top: 1px solid var(--rule); }
+  .svc { grid-template-columns: minmax(0, 1fr) 128px; }
+  .svc .meta { grid-column: 1 / -1; padding-top: 8px; }
+  .rl { grid-template-columns: 1fr; gap: 12px; }
+  .cta { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .sheet { padding: 0 20px 72px; }
+  .titleblock { grid-template-columns: 1fr; }
+  .titleblock div { border-left: none; border-top: 1px solid var(--rule); }
+  .titleblock div:first-child { border-top: none; }
+  .svc { grid-template-columns: 1fr; gap: 6px; }
+  .svc .fee { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* Standalone-document resets the artifact host used to supply. */
+img, svg, video { max-width: 100%; height: auto; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header class="plate">
+    <div class="wordmark">
+      <span class="sq" aria-hidden="true"></span>
+      <span class="name">Gossan</span>
+      <span class="suffix">Advisory</span>
+      <span class="kicker">Extraction economics &amp; production optimisation</span>
+    </div>
+
+    <div class="titleblock">
+      <div><dt>Discipline</dt>Reservoir, mine planning and project economics on one model</div>
+      <div><dt>Sectors</dt>Oil &amp; gas, coal, helium, uranium, rare earths, lithium, industrial minerals</div>
+      <div><dt>Clients</dt>Operators, private capital, royalty funds, reserve-based lenders</div>
+      <div><dt>Engagement</dt>Fixed fee, fixed scope, no software licence</div>
+    </div>
+  </header>
+
+  <section class="thesis">
+    <h1>Your production data already holds the answer. It is usually being <span class="mark">read wrong</span>.</h1>
+    <p class="lede">
+      We rebuild your assets as one auditable economic model, fit it to what they
+      actually produced, and hand you a ranked list of what to do next with a
+      price and a probability on every line. Not a dashboard. A decision.
+    </p>
+
+    <div class="proof">
+      <div>
+        <div class="fig">14%</div>
+        <div class="cap">How much one in-house model overstated its own project's value, from a single timing error nobody had reason to look for.</div>
+      </div>
+      <div>
+        <div class="fig">One basis</div>
+        <div class="cap">A coal mine and a shale pad valued the same way, so their competing capital requests can finally be ranked against each other.</div>
+      </div>
+      <div>
+        <div class="fig">Two weeks</div>
+        <div class="cap">From two spreadsheet exports to a reconciled model and a written finding. That is the entry engagement, and it is fixed fee.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <div class="block">
+    <div class="rail"><b>Position</b><span>What we sell</span></div>
+    <div class="col prose">
+      <h2>We do not sell software. We sell the finding.</h2>
+      <p>
+        Every operator already owns a model. It lives in a spreadsheet, it was
+        built by someone who has since left, and nobody has checked it against
+        what the asset actually did since the year it was made. The tools that
+        would replace it are licensed by the seat, siloed by commodity, and
+        priced for a major.
+      </p>
+      <p>
+        Gossan works the other way round. We bring the modelling
+        engine, you bring the data, and what you receive is a study: a written
+        report, the underlying model files, and a workshop with the people who
+        run the asset. There is no seat to license and nothing to administer
+        after we leave.
+      </p>
+      <p>
+        The engine handles the physics each commodity actually has. Wells decline
+        on a hyperbolic curve nobody chooses; mines run at a rate somebody does
+        choose, against a strip ratio that climbs; uranium leaches on its own
+        kinetics years after the wellfield was paid for; helium is separated out
+        of a gas stream that is declining underneath the plant. One cash-flow
+        engine values all of them, which is what makes the comparison honest.
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="block">
+    <div class="rail"><b>Services</b><span>Fixed fee, fixed scope</span></div>
+    <div class="col">
+      <h2>What we do, and what it costs</h2>
+      <p class="prose" style="color:var(--ink-2); margin-bottom: 26px;">
+        Fees are fixed on scope agreed before we start. Travel and third-party
+        data are billed at cost. Multi-asset work is discounted against the
+        portfolio rate rather than repeated per asset.
+      </p>
+
+      <div class="ledger">
+
+        <div class="svc lead">
+          <div>
+            <h3>Asset Health Check<span class="tag">Start here</span></h3>
+            <div class="desc">
+              One producing asset. We rebuild it from your own production and
+              cost history, fit the decline or the mine schedule to outturn, and
+              report where your current forecast is wrong, in which direction,
+              and what the error is worth. Two spreadsheet exports is usually all
+              we need.
+            </div>
+          </div>
+          <div class="meta">2 weeks<br>1 asset</div>
+          <div class="fee">$14,500<small>fixed</small></div>
+        </div>
+
+        <div class="svc">
+          <div>
+            <h3>Opportunity Screen</h3>
+            <div class="desc">
+              Everything that could be improved on the asset, tested one at a
+              time by re-running the whole model. We workshop the cost and the
+              odds of each with your operations team, then rank them on risked
+              value so a study competes fairly with a capital project.
+            </div>
+          </div>
+          <div class="meta">4 weeks<br>1&ndash;3 assets</div>
+          <div class="fee">$46,000<small>fixed</small></div>
+        </div>
+
+        <div class="svc">
+          <div>
+            <h3>Debottleneck &amp; Sizing Study</h3>
+            <div class="desc">
+              For a live expansion question. We shadow price every constraint by
+              relaxing and tightening it against the full model, then size the
+              dial with its capital properly coupled. The output separates what
+              is binding from what is merely large.
+            </div>
+          </div>
+          <div class="meta">4 weeks<br>1 facility</div>
+          <div class="fee">$52,000<small>fixed</small></div>
+        </div>
+
+        <div class="svc">
+          <div>
+            <h3>Portfolio Capital Allocation</h3>
+            <div class="desc">
+              Five to twenty assets on one valuation basis. A single ranked
+              ledger of every priced opportunity across all of them, an exact
+              allocation of your budget, and the value-against-budget curve that
+              shows where more capital stops buying more value. Board-ready.
+            </div>
+          </div>
+          <div class="meta">8 weeks<br>5&ndash;20 assets</div>
+          <div class="fee">$128,000<small>fixed</small></div>
+        </div>
+
+        <div class="svc">
+          <div>
+            <h3>Transaction Diligence</h3>
+            <div class="desc">
+              An independent model of an acquisition or a lending target, built
+              from public filings and the data room. Breakeven price, downside
+              distribution, and a written list of the assumptions the seller's
+              model is carrying that ours would not.
+            </div>
+          </div>
+          <div class="meta">3 weeks<br>per target</div>
+          <div class="fee">$38,000<small>fixed</small></div>
+        </div>
+
+        <div class="svc">
+          <div>
+            <h3>Model Build &amp; Handover</h3>
+            <div class="desc">
+              You keep the model. We build your assets as version-controlled
+              scenario files, train two of your analysts to run and change them,
+              and leave the documentation. Every assumption is one line in a text
+              file, so next year's change is a diff rather than an archaeology
+              project.
+            </div>
+          </div>
+          <div class="meta">6 weeks<br>+ training</div>
+          <div class="fee">$72,000<small>fixed</small></div>
+        </div>
+
+        <div class="svc">
+          <div>
+            <h3>Quarterly Reforecast</h3>
+            <div class="desc">
+              For assets we have already modelled. We re-run against the latest
+              actuals, decompose the variance into volume, price and cost, and
+              flag any parameter that has drifted far enough to need refitting.
+              Bought per quarter, not by subscription.
+            </div>
+          </div>
+          <div class="meta">per quarter<br>existing model</div>
+          <div class="fee">$9,500<small>per run</small></div>
+        </div>
+
+        <div class="svc">
+          <div>
+            <h3>Advisory &amp; Expert Support</h3>
+            <div class="desc">
+              Board papers, lender questions, reserve committee support, and
+              second opinions on someone else's model. Billed by the day against
+              a scoped block.
+            </div>
+          </div>
+          <div class="meta">by the day<br>min. 3 days</div>
+          <div class="fee">$3,200<small>per day</small></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="block">
+    <div class="rail"><b>Data</b><span>What we ask for</span><span>and where it comes from</span></div>
+    <div class="col">
+      <h2>The data request is one page long</h2>
+      <p class="prose" style="color:var(--ink-2); margin-bottom: 28px;">
+        The most common reason a modelling project stalls is a data request that
+        reads like a discovery motion. Ours does not. For a producing asset in
+        the United States, roughly two thirds of what we need is already public,
+        and we pull that ourselves before asking you for anything.
+      </p>
+
+      <div class="two">
+        <div>
+          <p class="sublabel">From you, once</p>
+          <ul class="list">
+            <li>
+              Monthly volumes by well or by pit, with producing days and active
+              well count
+              <span class="src">CSV export from Enertia, Quorum, W&nbsp;Energy, P2 or your own sheet</span>
+            </li>
+            <li>
+              Monthly operating cost by lease or by cost centre
+              <span class="src">General ledger export; account detail is useful, not required</span>
+            </li>
+            <li>
+              Authorisations for expenditure and actual capital spent
+              <span class="src">One row per well, pattern, or major package</span>
+            </li>
+            <li>
+              Realised price by month, or the revenue distributions it comes from
+              <span class="src">This is where basis and quality deducts become visible</span>
+            </li>
+            <li>
+              Lease and fiscal terms: royalty, working interest, net revenue
+              interest, severance and ad valorem rates
+              <span class="src">Usually one page from the land department</span>
+            </li>
+            <li>
+              Optional, and worth having: downtime and workover logs, water
+              disposal contracts, offtake terms
+              <span class="src">These turn a good model into a defensible one</span>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="sublabel">We collect ourselves</p>
+          <ul class="list">
+            <li>
+              Well-level production and completion records
+              <span class="src">Texas RRC, PA DEP, Wyoming OGCC, NDIC, OCD and equivalents</span>
+            </li>
+            <li>
+              Mine production, employment and hours
+              <span class="src">MSHA quarterly data, published per mine ID</span>
+            </li>
+            <li>
+              Reserves, grades, recoveries and cost estimates on comparable projects
+              <span class="src">SK-1300 filings on SEC EDGAR; NI 43-101 on SEDAR+</span>
+            </li>
+            <li>
+              Price history, basis differentials and heat content
+              <span class="src">EIA series, published index settlements</span>
+            </li>
+            <li>
+              Deposit type, host geology and analogue parameters
+              <span class="src">USGS Mineral Resources Data System, national assessments</span>
+            </li>
+            <li>
+              Peer cost structures and capital intensity
+              <span class="src">Public company filings, back-calculated per unit</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <p class="prose" style="margin-top: 26px; color: var(--ink-2);">
+        Nothing leaves our custody. Data arrives under an NDA signed before the
+        request goes out, is held in a single-client workspace, and is returned
+        or destroyed at your instruction when the engagement closes.
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="block">
+    <div class="rail"><b>Method</b><span>Worked example</span><span>Data to decision</span></div>
+    <div class="col">
+      <h2>What actually happens to the data</h2>
+      <p class="prose" style="color:var(--ink-2); margin-bottom: 26px;">
+        The engagement below is a representative example, modelled on a
+        six-well tight oil pad. The figures are model output used to show the
+        method, not a named client's results.
+      </p>
+
+      <div class="case">
+        <div class="case-head">
+          <span class="who">Six-well pad &middot; Delaware Basin &middot; 34 months of history</span>
+          <span class="note">Illustrative engagement</span>
+        </div>
+
+        <div class="step">
+          <div class="n">01</div>
+          <div>
+            <h3>What arrived</h3>
+            <p>
+              Two CSV exports. Monthly oil, gas and water by lease with producing
+              days and well count; monthly operating cost from the ledger. Plus
+              one page of lease terms. Nothing else was requested.
+            </p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="n">02</div>
+          <div>
+            <h3>What the existing forecast said</h3>
+            <p>
+              The in-house model fitted a single decline curve to total field
+              rate. Three more wells had come online in month twelve, so the rate
+              rose in the middle of the history and no decline curve could fit
+              it. The regression was reported without its quality measure.
+            </p>
+            <div class="out">fit to field rate      R&#178; <b>0.15</b>   implied pad recovery <b>5.0 MMbbl</b>
+b exponent             <b>0.00</b>   which is a straight exponential</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="n">03</div>
+          <div>
+            <h3>What we did to it</h3>
+            <p>
+              Normalised rate per producing well, so adding wells stopped looking
+              like a reservoir doing something impossible. Segmented the history
+              at the last step up in rate, so the fit saw one curve instead of
+              two vintages. Dropped the flowback month. Fitted on the logarithm
+              of rate, because production spans two orders of magnitude and a fit
+              on raw rate ignores the tail the reserve lives in.
+            </p>
+            <div class="out">fit per well           R&#178; <b>0.977</b>   recovery per well <b>705,000 bbl</b>
+initial decline        <b>54%</b> secant  b exponent <b>1.00</b>
+independent type curve <b>725,000 bbl</b>  &mdash; agreement within 3%</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="n">04</div>
+          <div>
+            <h3>What that changed in the economics</h3>
+            <p>
+              The annual model charged drilling capital and first-year flush
+              production to the same period, which flatters the cash flow a
+              discount rate weights most heavily. Separating spud from first
+              sales moved two numbers that matter to different people.
+            </p>
+            <div class="out">net present value      <b>$80.6M</b> &rarr; <b>$70.8M</b>   overstated by 14%
+peak capital exposure  <b>$0.8M</b>  &rarr; <b>$30.9M</b>   the number treasury needs</div>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="n">05</div>
+          <div>
+            <h3>What we recommended</h3>
+            <p>
+              Four improvements were priced with the operations team and ranked
+              on risked value. The one everybody wanted did not survive it. The
+              one that ranked first needed no capital at all.
+            </p>
+            <div class="out">renegotiate basis marketing   cost <b>$0</b>      risked <b>+$1.0M</b>   45% odds
+pit-side water recycling      cost <b>$6.5M</b>   risked <b>&minus;$3.3M</b>   90% odds
+refrac three parent wells     cost <b>$9.6M</b>   risked <b>&minus;$6.7M</b>   55% odds
+convert tail to gas lift      cost <b>$2.4M</b>   risked <b>&minus;$2.4M</b>   worthless</div>
+            <p style="margin-top:12px">
+              The gas lift conversion returned nothing because the recovery cap
+              already bound the well: flattening the tail moved no barrels. That
+              is not a judgement about gas lift. It is what this asset's own
+              physics says, and it is invisible without a model that carries it.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="block">
+    <div class="rail"><b>Findings</b><span>Recurring defects</span><span>Redline list</span></div>
+    <div class="col">
+      <h2>Eight ways a production model quietly lies</h2>
+      <p class="prose" style="color:var(--ink-2); margin-bottom: 24px;">
+        These are the errors we find most often, in models built by competent
+        people. Each one is invisible in the output and each one moves the answer
+        in the same direction, which is toward approval.
+      </p>
+
+      <div class="redlines">
+
+        <div class="rl">
+          <div>
+            <h3>Decline fitted to field rate instead of per-well rate</h3>
+            <p>Adding wells makes total rate rise. No decline curve can fit that, so the regression collapses onto a straight exponential and the recovery estimate follows it.</p>
+          </div>
+          <div class="cost">R&#178; falls from 0.98 to 0.15.<br>Recovery misread by a factor.</div>
+        </div>
+
+        <div class="rl">
+          <div>
+            <h3>Decline quoted on the wrong basis</h3>
+            <p>A "70% decline" is three different numbers depending on whether it is secant, tangent or nominal. Type curves are quoted one way and modelled another more often than not.</p>
+          </div>
+          <div class="cost">15&ndash;25% on estimated<br>ultimate recovery.</div>
+        </div>
+
+        <div class="rl">
+          <div>
+            <h3>Capital and flush production in the same period</h3>
+            <p>A well spudded during a year does not produce for that whole year. Charging both to period one moves cash into exactly the period a discount rate rewards most.</p>
+          </div>
+          <div class="cost">14% overstatement of value.<br>Peak funding need hidden.</div>
+        </div>
+
+        <div class="rl">
+          <div>
+            <h3>Constant strip ratio, constant grade</h3>
+            <p>A pit deepens and its best ore goes first. A mine modelled at one strip ratio and one grade across its life is not conservative; it is describing a different mine.</p>
+          </div>
+          <div class="cost">Unit costs understated<br>across the back half.</div>
+        </div>
+
+        <div class="rl">
+          <div>
+            <h3>Reclamation capitalised rather than expensed</h3>
+            <p>By the time closure is paid there is no production left to depreciate it against. Pooled into capital under units of production, the deduction is stranded entirely.</p>
+          </div>
+          <div class="cost">Real cash, and it lands<br>in the terminal years.</div>
+        </div>
+
+        <div class="rl">
+          <div>
+            <h3>Nameplate mistaken for a bottleneck</h3>
+            <p>A plant can be exactly the right size while something upstream is binding. Expansion capital is routinely proposed against the constraint that is easiest to measure, not the one that is holding the asset back.</p>
+          </div>
+          <div class="cost">Capital spent where the<br>shadow price is zero.</div>
+        </div>
+
+        <div class="rl">
+          <div>
+            <h3>Opportunities ranked on gross uplift</h3>
+            <p>Every asset team's best idea wins its own study, because none of them carry a cost or a probability. Ranked on risked value across a portfolio, the ordering usually inverts.</p>
+          </div>
+          <div class="cost">The free commercial fix<br>loses to the big project.</div>
+        </div>
+
+        <div class="rl">
+          <div>
+            <h3>Variance reported as a single number</h3>
+            <p>"We were eleven million light" points nobody at anything. Split into volume, price, cost usage and cost rate, the same eleven million names the department that can act on it.</p>
+          </div>
+          <div class="cost">A month of argument,<br>every month.</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="block">
+    <div class="rail"><b>Process</b><span>How an engagement runs</span></div>
+    <div class="col prose">
+      <h2>Six steps, and the first two are free</h2>
+      <ol class="flow">
+        <li>
+          <div>
+            <h3>Scoping call<span class="when">45 minutes, no charge</span></h3>
+            <p>What the asset is, what decision is pending, and whether we are the right people for it. We will say so if we are not.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Data request and NDA<span class="when">One page, no charge</span></h3>
+            <p>Sent after the call, scoped to the specific asset. We start collecting the public half while you assemble yours.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Build and reconcile<span class="when">Week 1&ndash;2</span></h3>
+            <p>The model is built and then fitted to what the asset actually did. Any gap between the two is reported before anything is optimised, because a model that has not been checked against outturn is an opinion.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Costing workshop<span class="when">Half a day, on site or remote</span></h3>
+            <p>Your operations and engineering people put a cost, a probability and a lead time on each candidate improvement. We supply the value; they supply the judgement. This is the step that makes the ranking defensible.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Delivery<span class="when">Written report and read-out</span></h3>
+            <p>A self-contained report, the model files, the year-by-year cash flow as a spreadsheet, and a two-hour session with whoever needs to act on it.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3>Re-run, when you want it<span class="when">Per quarter, optional</span></h3>
+            <p>The model stays yours. We re-run it against new actuals when it is useful to, and not on a calendar because a subscription says so.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="block">
+    <div class="rail"><b>Scope</b><span>Boundaries</span></div>
+    <div class="col prose">
+      <h2>What we are not</h2>
+      <div class="bounds">
+        <div><span class="x">&times;</span><span><strong>Not a reserves certifier.</strong> We do not sign SK-1300 or NI 43-101 reports and we are not a qualified person for that purpose. Our work supports a reserves process; it does not replace one, and anybody who tells you otherwise is selling something.</span></div>
+        <div><span class="x">&times;</span><span><strong>Not a software vendor.</strong> There is no seat, no licence and no renewal. If you want the model in-house, we build it and hand it over once.</span></div>
+        <div><span class="x">&times;</span><span><strong>Not a data provider.</strong> We use public sources and yours. Where a commercial subscription is genuinely needed, we say so and it is billed at cost.</span></div>
+        <div><span class="x">&times;</span><span><strong>Not a price forecaster.</strong> We take your price deck, or a published one, and tell you how wrong it can be before the answer changes sign. That question is answerable; the other one is not.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="block">
+    <div class="rail"><b>Name</b><span>Etymology</span></div>
+    <div class="col prose">
+      <h2>Why Gossan</h2>
+      <p>
+        A gossan is the iron-stained crust that forms where an orebody reaches
+        the surface and weathers. It is not the ore. It is the rust the ore
+        leaves behind, and for most of the history of mining it was the only
+        evidence anyone had. A prospector who could read a gossan knew roughly
+        what lay underneath, how deep, and whether it was worth the shaft,
+        before a single metre was drilled.
+      </p>
+      <p>
+        That is the discipline this firm is named for. Your production history,
+        your cost ledger and your public filings are the surface expression of
+        an asset whose real behaviour is underground and cannot be observed
+        directly. The data is already there, and it is already telling you
+        something. The work is reading it correctly.
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="block" style="border-top:none; padding-top: 8px;">
+    <div class="rail"><b>Next</b><span>Start here</span></div>
+    <div class="col">
+      <div class="cta">
+        <div>
+          <h2>Send us one asset and two spreadsheets.</h2>
+          <p>
+            The Health Check exists to be the cheapest possible way to find out
+            whether we are worth the larger engagement. Two weeks, fixed fee, and
+            a written answer either way.
+          </p>
+        </div>
+        <a class="btn" href="mailto:hello@gossanadvisory.com?subject=Asset%20Health%20Check">Book a scoping call</a>
+      </div>
+    </div>
+  </div>
+
+  <footer class="colophon">
+    <span>Gossan Advisory &middot; Extraction economics and production optimisation</span>
+    <button class="theme-btn" type="button" id="theme">Light / dark</button>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById("theme");
+  if (!btn) return;
+  btn.addEventListener("click", function () {
+    var root = document.documentElement;
+    var now = root.getAttribute("data-theme");
+    var dark = now
+      ? now === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    root.setAttribute("data-theme", dark ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>
