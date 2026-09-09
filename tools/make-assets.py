@@ -106,13 +106,10 @@ def write_og_image() -> None:
     draw.rectangle([left, 150, left + 46, 196], fill=RUST_DARK)
 
     name = load("bold", 128)
-    suffix = load("regular", 70)
     label = load("mono", 25)
     line = load("regular", 34)
 
-    draw.text((left, 232), "Gossan", font=name, fill=PAPER)
-    name_width = draw.textlength("Gossan", font=name)
-    draw.text((left + name_width + 22, 288), "Advisory", font=suffix, fill=MUTED)
+    draw.text((left, 232), "Gossans", font=name, fill=PAPER)
 
     draw.line([(left, 420), (width - left, 420)], fill=RULE, width=2)
 
