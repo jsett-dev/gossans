@@ -12,7 +12,6 @@ public/                 everything that gets served
   og-image.png          1200x630 social share card
   robots.txt            crawler policy
   sitemap.xml           one URL, update if pages are added
-wrangler.toml           Cloudflare config: upload public/ as static assets
 tools/                  regenerates the three raster assets above
 CNAME                   custom domain, read by GitHub Pages only
 .nojekyll               stops GitHub Pages running Jekyll over the files
