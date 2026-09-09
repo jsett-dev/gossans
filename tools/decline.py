@@ -149,11 +149,54 @@ def fit(t, q, b_bounds=(0.0, 2.0), di_bounds=(0.05, 5.0), rounds=6, nodes=40):
     }
 
 
-def eur(params, q_limit, cum_to_date=0.0):
-    """Estimated ultimate recovery down to an economic limit rate."""
-    return cum_to_date + cumulative(
-        params["qi"], params["Di_nominal"], params["b"], q_limit
-    ) * 365.25
+def switch_time(Di, b, terminal_effective):
+    """When a hyperbolic decline flattens to the terminal rate, in years.
+
+    Nominal decline under a hyperbolic falls with time, D(t) = Di / (1 + b Di t),
+    so this solves for the moment it reaches the terminal rate. Returns None
+    when the curve is exponential already, or is flatter than terminal to begin
+    with, in which case there is nothing to switch to.
+    """
+    if b < B_EXPONENTIAL:
+        return None
+    Dt = -math.log(1.0 - terminal_effective)      # nominal, exponential basis
+    if Dt <= 0 or Dt >= Di:
+        return None
+    return (Di / Dt - 1.0) / (b * Di)
+
+
+def eur(params, q_limit, cum_to_date=0.0, terminal_effective=0.06):
+    """Estimated ultimate recovery down to an economic limit rate.
+
+    A hyperbolic with an exponent near or above one barely converges when it is
+    integrated forever, and exponents that high are ordinary in unconventional
+    wells early in life. Left unswitched, the forecast books a reserve the well
+    will never deliver, and it does so quietly.
+
+    So the curve runs hyperbolic until its own decline flattens to
+    `terminal_effective`, then exponential at that rate down to the economic
+    limit. Six percent a year is a common default. Pass None to disable the
+    switch, which is only defensible for a genuinely exponential fit.
+    """
+    qi, Di, b = params["qi"], params["Di_nominal"], params["b"]
+    plain = cumulative(qi, Di, b, q_limit)
+
+    if terminal_effective is None:
+        return cum_to_date + plain * 365.25
+
+    t_switch = switch_time(Di, b, terminal_effective)
+    if t_switch is None:
+        return cum_to_date + plain * 365.25
+
+    q_switch = rate(t_switch, qi, Di, b)
+    if q_switch <= q_limit:
+        # The economic limit arrives before the curve ever flattens that far.
+        return cum_to_date + plain * 365.25
+
+    Dt = -math.log(1.0 - terminal_effective)
+    hyperbolic = cumulative(qi, Di, b, q_switch)
+    tail = (q_switch - q_limit) / Dt
+    return cum_to_date + (hyperbolic + tail) * 365.25
 
 
 # --------------------------------------------------------------------------
@@ -285,6 +328,21 @@ def _self_test():
         print("  b %.2f  nominal %.3f -> secant %.1f%% -> nominal %.3f"
               % (b, Di, De * 100, back))
         assert abs(back - Di) < 1e-6
+
+    print()
+    print("Terminal decline switch, economic limit 5, terminal 6% a year")
+    for b in (0.0, 0.5, 1.0, 1.4, 1.8):
+        p = {"qi": 900.0, "Di_nominal": 2.2, "b": b}
+        raw = eur(p, 5.0, terminal_effective=None)
+        sw = eur(p, 5.0, terminal_effective=0.06)
+        print("  b %.1f  unswitched %12s  switched %12s  %+6.1f%%"
+              % (b, format(int(raw), ","), format(int(sw), ","),
+                 (sw - raw) / raw * 100.0))
+        assert sw <= raw + 1, "the switch must never raise recovery"
+        if b >= 1.0:
+            assert sw < raw * 0.9, "a high exponent must be cut materially"
+        else:
+            assert abs(sw - raw) < 1, "a flat curve needs no switch"
 
     print()
     print("The field-rate failure the site describes")
