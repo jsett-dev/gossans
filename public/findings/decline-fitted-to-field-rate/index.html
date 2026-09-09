@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decline fitted to field rate instead of per-well rate | Gossans</title>
+<meta name="description" content="Fitting an Arps decline to total field rate collapses the regression onto a straight exponential and misreads recovery by a factor. How the error happens, how to test for it, and how to fix the fit.">
+<link rel="canonical" href="https://www.gossans.com/findings/decline-fitted-to-field-rate/">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Gossans">
+<meta property="og:url" content="https://www.gossans.com/findings/decline-fitted-to-field-rate/">
+<meta property="og:title" content="Decline fitted to field rate instead of per-well rate | Gossans">
+<meta property="og:description" content="Fitting an Arps decline to total field rate collapses the regression onto a straight exponential and misreads recovery by a factor. How the error happens, how to test for it, and how to fix the fit.">
+<meta property="og:image" content="https://www.gossans.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://www.gossans.com/og-image.png">
+<meta name="twitter:title" content="Decline fitted to field rate instead of per-well rate | Gossans">
+<meta name="twitter:description" content="Fitting an Arps decline to total field rate collapses the regression onto a straight exponential and misreads recovery by a factor. How the error happens, how to test for it, and how to fix the fit.">
+
+<meta name="theme-color" content="#f1f2ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14181a" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/favicon.ico" sizes="32x32">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+:root {
+  color-scheme: light;
+
+  /* Vellum ground, drafting ink, red-pencil markup. */
+  --paper:      #f1f2ef;
+  --paper-2:    #e9ebe6;
+  --paper-3:    #dfe2dc;
+  --ink:        #14181a;
+  --ink-2:      #444b4d;
+  --ink-3:      #6d7573;
+  --rule:       #c7ccc5;
+  --rule-soft:  #d9ddd6;
+  --draft:      #22506b;   /* diluted drafting ink */
+  --draft-soft: #dde6ec;
+  --redline:    #a3301f;   /* the correction pencil */
+  --redline-soft: #f0dcd8;
+  --good:       #2f6b46;
+
+  --shadow: 0 1px 0 var(--rule);
+
+  --f-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --f-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper:      #14181a;
+    --paper-2:    #1b2022;
+    --paper-3:    #232a2c;
+    --ink:        #e8eae5;
+    --ink-2:      #b3bab8;
+    --ink-3:      #838c8a;
+    --rule:       #2d3538;
+    --rule-soft:  #232a2c;
+    --draft:      #6ba3c6;
+    --draft-soft: #1c2c36;
+    --redline:    #dd7361;
+    --redline-soft: #33201d;
+    --good:       #6fb98a;
+    --shadow: 0 1px 0 var(--rule);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper:      #14181a;
+  --paper-2:    #1b2022;
+  --paper-3:    #232a2c;
+  --ink:        #e8eae5;
+  --ink-2:      #b3bab8;
+  --ink-3:      #838c8a;
+  --rule:       #2d3538;
+  --rule-soft:  #232a2c;
+  --draft:      #6ba3c6;
+  --draft-soft: #1c2c36;
+  --redline:    #dd7361;
+  --redline-soft: #33201d;
+  --good:       #6fb98a;
+  --shadow: 0 1px 0 var(--rule);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.sheet {
+  max-width: 1140px;
+  margin: 0 auto;
+  padding: 0 32px 96px;
+}
+
+/* ---------- drafting annotation rail ---------- */
+
+.block {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 0 40px;
+  padding: 52px 0;
+  border-top: 1px solid var(--rule);
+}
+.block:first-of-type { border-top: none; }
+
+.rail {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  line-height: 1.7;
+  padding-top: 6px;
+}
+.rail b {
+  display: block;
+  color: var(--draft);
+  font-weight: 600;
+}
+.rail span { display: block; }
+
+.col { min-width: 0; }
+.prose { max-width: 66ch; }
+
+/* ---------- type ---------- */
+
+h1, h2, h3 {
+  font-family: var(--f-display);
+  text-wrap: balance;
+  margin: 0;
+}
+h2 {
+  font-size: clamp(26px, 3.2vw, 34px);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.12;
+  margin-bottom: 14px;
+}
+h3 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.005em;
+  margin-bottom: 4px;
+}
+p { margin: 0 0 16px; }
+p:last-child { margin-bottom: 0; }
+.lede { font-size: 19px; line-height: 1.55; color: var(--ink-2); }
+strong { font-weight: 600; }
+em { font-style: italic; color: var(--ink-2); }
+
+.num { font-family: var(--f-data); font-variant-numeric: tabular-nums; }
+
+/* ---------- nameplate ---------- */
+
+header.plate { padding: 44px 0 0; }
+
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.wordmark .sq {
+  width: 13px;
+  height: 13px;
+  background: var(--redline);
+  align-self: center;
+  flex: none;
+}
+.wordmark .name {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: clamp(30px, 4vw, 42px);
+  letter-spacing: -.035em;
+  line-height: 1;
+}
+.wordmark .kicker {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--draft);
+}
+
+.titleblock {
+  margin-top: 26px;
+  border: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--paper-2);
+}
+.titleblock div {
+  padding: 12px 16px;
+  border-left: 1px solid var(--rule);
+  font-family: var(--f-data);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.titleblock div:first-child { border-left: none; }
+.titleblock dt {
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 4px;
+}
+
+/* ---------- thesis ---------- */
+
+.thesis {
+  padding: 64px 0 60px;
+  border-bottom: 1px solid var(--rule);
+}
+.thesis h1 {
+  font-size: clamp(34px, 5.4vw, 60px);
+  font-weight: 800;
+  letter-spacing: -.038em;
+  line-height: 1.02;
+  max-width: 20ch;
+}
+.thesis h1 .mark {
+  color: var(--redline);
+  text-decoration: underline;
+  text-decoration-color: var(--redline);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+.thesis .lede { margin-top: 26px; max-width: 62ch; }
+
+.proof {
+  margin-top: 40px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  border-top: 1px solid var(--rule);
+}
+.proof > div {
+  padding: 18px 20px 16px 0;
+  border-right: 1px solid var(--rule-soft);
+}
+.proof > div:last-child { border-right: none; }
+.proof .fig {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 30px;
+  letter-spacing: -.03em;
+  color: var(--draft);
+  font-variant-numeric: tabular-nums;
+}
+.proof .cap {
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+/* ---------- services ledger ---------- */
+
+.ledger { border-top: 1px solid var(--rule); }
+
+.svc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px 150px;
+  gap: 0 28px;
+  padding: 22px 8px 22px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  align-items: start;
+  transition: background .12s ease;
+}
+.svc:hover { background: var(--paper-2); }
+.svc .desc { font-size: 15.5px; color: var(--ink-2); line-height: 1.5; margin-top: 4px; }
+.svc .meta {
+  font-family: var(--f-data);
+  font-size: 12px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  padding-top: 4px;
+}
+.svc .fee {
+  font-family: var(--f-data);
+  font-size: 19px;
+  font-weight: 500;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  padding-top: 1px;
+}
+.svc .fee small {
+  display: block;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 400;
+  margin-top: 3px;
+}
+.svc.lead { background: var(--draft-soft); padding-left: 16px; margin-left: -16px; }
+.svc.lead:hover { background: var(--draft-soft); }
+.tag {
+  display: inline-block;
+  font-family: var(--f-data);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--draft);
+  border: 1px solid var(--draft);
+  padding: 1px 6px;
+  margin-left: 8px;
+  vertical-align: 2px;
+}
+
+/* ---------- data request ---------- */
+
+.two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 34px;
+}
+.list { list-style: none; margin: 0; padding: 0; }
+.list li {
+  padding: 9px 0 9px 0;
+  border-bottom: 1px dotted var(--rule);
+  font-size: 15.5px;
+  line-height: 1.5;
+}
+.list li:last-child { border-bottom: none; }
+.list .src {
+  display: block;
+  font-family: var(--f-data);
+  font-size: 11.5px;
+  color: var(--ink-3);
+  letter-spacing: .02em;
+  margin-top: 3px;
+}
+.sublabel {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--draft);
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* ---------- worked example ---------- */
+
+.case { border: 1px solid var(--rule); background: var(--paper-2); }
+.case-head {
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.case-head .who { font-family: var(--f-display); font-weight: 700; font-size: 17px; }
+.case-head .note {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.step {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 0 16px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.step:last-child { border-bottom: none; }
+.step .n {
+  font-family: var(--f-data);
+  font-size: 12px;
+  color: var(--draft);
+  padding-top: 3px;
+  font-weight: 500;
+}
+.step h3 { margin-bottom: 6px; }
+.step p { font-size: 15.5px; color: var(--ink-2); margin-bottom: 0; }
+.step .out {
+  margin-top: 10px;
+  font-family: var(--f-data);
+  font-size: 13px;
+  line-height: 1.75;
+  background: var(--paper-3);
+  border-left: 2px solid var(--draft);
+  padding: 10px 14px;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--ink-2);
+}
+.step .out b { color: var(--ink); font-weight: 600; }
+
+/* ---------- redline findings ---------- */
+
+.redlines { border-top: 1px solid var(--rule); }
+.rl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 0 28px;
+  padding: 18px 0 18px 18px;
+  border-bottom: 1px solid var(--rule-soft);
+  position: relative;
+}
+.rl::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 22px;
+  width: 8px; height: 8px;
+  background: var(--redline);
+}
+.rl h3 { font-size: 16px; }
+.rl p { font-size: 15px; color: var(--ink-2); margin: 4px 0 0; }
+.rl .cost {
+  font-family: var(--f-data);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--redline);
+  background: var(--redline-soft);
+  padding: 8px 12px;
+  align-self: start;
+}
+
+/* ---------- process ---------- */
+
+.flow { counter-reset: s; display: grid; gap: 0; }
+.flow li {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 0 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--rule-soft);
+}
+.flow li::before {
+  counter-increment: s;
+  content: counter(s, decimal-leading-zero);
+  font-family: var(--f-data);
+  font-size: 13px;
+  color: var(--draft);
+  padding-top: 3px;
+}
+.flow p { font-size: 15.5px; color: var(--ink-2); margin: 4px 0 0; }
+.flow .when {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-left: 10px;
+}
+
+/* ---------- boundaries ---------- */
+
+.bounds { display: grid; gap: 10px; }
+.bounds div {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 15.5px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+.bounds .x { color: var(--redline); font-family: var(--f-data); }
+
+/* ---------- contact ---------- */
+
+.cta {
+  border: 1px solid var(--ink);
+  background: var(--paper-2);
+  padding: 34px 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 28px;
+  align-items: center;
+}
+.cta h2 { margin-bottom: 8px; }
+.cta p { color: var(--ink-2); font-size: 16px; max-width: 52ch; }
+.cta a.btn {
+  font-family: var(--f-data);
+  font-size: 13px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--paper);
+  background: var(--ink);
+  padding: 15px 26px;
+  border: 1px solid var(--ink);
+  white-space: nowrap;
+  display: inline-block;
+  transition: background .12s ease, color .12s ease;
+}
+.cta a.btn:hover { background: var(--draft); border-color: var(--draft); color: #fff; }
+
+a { color: var(--draft); text-underline-offset: 2px; }
+a:focus-visible, .btn:focus-visible, button:focus-visible {
+  outline: 2px solid var(--redline);
+  outline-offset: 2px;
+}
+
+footer.colophon {
+  border-top: 1px solid var(--rule);
+  margin-top: 8px;
+  padding: 24px 0 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-family: var(--f-data);
+  font-size: 11.5px;
+  letter-spacing: .06em;
+  color: var(--ink-3);
+  text-transform: uppercase;
+}
+.theme-btn {
+  font: inherit;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid var(--rule);
+  color: var(--ink-3);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.theme-btn:hover { color: var(--ink); border-color: var(--ink-3); }
+
+@media (max-width: 900px) {
+  .block { grid-template-columns: 1fr; gap: 14px; padding: 40px 0; }
+  .rail { padding-top: 0; }
+  .rail b { display: inline; }
+  .rail span { display: inline; margin-left: 10px; }
+  .titleblock { grid-template-columns: repeat(2, 1fr); }
+  .titleblock div:nth-child(3) { border-left: none; }
+  .titleblock div:nth-child(n+3) { border-top: 1px solid var(--rule); }
+  .svc { grid-template-columns: minmax(0, 1fr) 128px; }
+  .svc .meta { grid-column: 1 / -1; padding-top: 8px; }
+  .rl { grid-template-columns: 1fr; gap: 12px; }
+  .cta { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .sheet { padding: 0 20px 72px; }
+  .titleblock { grid-template-columns: 1fr; }
+  .titleblock div { border-left: none; border-top: 1px solid var(--rule); }
+  .titleblock div:first-child { border-top: none; }
+  .svc { grid-template-columns: 1fr; gap: 6px; }
+  .svc .fee { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* Standalone-document resets the artifact host used to supply. */
+img, svg, video { max-width: 100%; height: auto; }
+[hidden] { display: none !important; }
+
+/* ---- Navigation to the secondary pages ------------------------- */
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px 32px;
+  flex-wrap: wrap;
+}
+.masthead .home {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+.topnav {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+.topnav a {
+  color: var(--ink-2);
+  text-decoration: none;
+  padding: 4px 0;
+  border-bottom: 1px solid transparent;
+}
+.topnav a:hover { color: var(--ink); border-bottom-color: var(--rust); }
+.rl h3 a { color: inherit; text-decoration: none; }
+.rl h3 a:hover { color: var(--rust); }
+.rl h3 a::after { content: " \2192"; color: var(--rust); opacity: .55; }
+@media (max-width: 700px) { .topnav { gap: 14px; font-size: 10px; } }
+</style>
+<style>
+.crumb { font-family:var(--f-data); font-size:11px; letter-spacing:.14em;
+         text-transform:uppercase; color:var(--ink-3); margin-bottom:16px; }
+.crumb a { color:var(--ink-3); }
+.crumb a:hover { color:var(--rust); }
+.article h1 { max-width:24ch; }
+.standfirst { font-size:19px; line-height:1.55; color:var(--ink-2);
+              max-width:60ch; margin:0 0 4px; }
+.costline { font-family:var(--f-data); font-size:13px; line-height:1.75;
+            color:var(--rust); border-left:2px solid var(--rust);
+            padding:12px 0 12px 18px; margin:28px 0; }
+.indexlist a.row { display:grid; grid-template-columns:3rem 1fr auto; gap:18px;
+                   align-items:baseline; padding:22px 0;
+                   border-top:1px solid var(--rule-2); text-decoration:none;
+                   color:inherit; }
+.indexlist a.row:hover h3 { color:var(--rust); }
+.indexlist .num { font-family:var(--f-data); font-size:12px; color:var(--ink-3); }
+.indexlist h3 { margin:0 0 6px; }
+.indexlist p { margin:0; color:var(--ink-2); max-width:62ch; }
+.indexlist .tag { font-family:var(--f-data); font-size:11px; color:var(--ink-3);
+                  letter-spacing:.1em; text-transform:uppercase; white-space:nowrap; }
+.pager { display:flex; justify-content:space-between; gap:24px; margin-top:36px;
+         padding-top:20px; border-top:1px solid var(--rule-2);
+         font-family:var(--f-data); font-size:12px; line-height:1.6; }
+.pager a { color:var(--ink-2); text-decoration:none; max-width:46%; }
+.pager a:hover { color:var(--rust); }
+.pager .dir { display:block; color:var(--ink-3); letter-spacing:.12em;
+              text-transform:uppercase; font-size:10px; margin-bottom:4px; }
+.todo { border:1px dashed var(--rust); padding:18px 20px; margin:22px 0;
+        font-family:var(--f-data); font-size:13px; line-height:1.7;
+        color:var(--ink-2); }
+.todo b { color:var(--rust); display:block; margin-bottom:6px;
+          letter-spacing:.1em; text-transform:uppercase; font-size:11px; }
+@media (max-width:700px) {
+  .indexlist a.row { grid-template-columns:2rem 1fr; }
+  .indexlist .tag { display:none; }
+}
+</style>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Decline fitted to field rate instead of per-well rate",
+  "description": "Fitting an Arps decline to total field rate collapses the regression onto a straight exponential and misreads recovery by a factor. How the error happens, how to test for it, and how to fix the fit.",
+  "url": "https://www.gossans.com/findings/decline-fitted-to-field-rate/",
+  "isPartOf": {
+    "@type": "CollectionPage",
+    "name": "Redline list",
+    "url": "https://www.gossans.com/findings/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Gossans",
+    "url": "https://www.gossans.com/"
+  }
+}
+</script>
+</head>
+<body>
+<div class="sheet">
+
+  <header class="plate">
+    <div class="masthead">
+      <div class="wordmark">
+        <a class="home" href="/">
+          <span class="sq" aria-hidden="true"></span>
+          <span class="name">Gossans</span>
+        </a>
+        <span class="kicker">Redline list &middot; 01 of 08</span>
+      </div>
+      <nav class="topnav">
+        <a href="/findings/">Findings</a>
+        <a href="/about/">About</a>
+        <a href="/contact/">Contact</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="thesis article">
+    <div class="crumb"><a href="/findings/">Findings</a> &middot; 01 of 08</div>
+    <h1>Decline fitted to field rate instead of per-well rate</h1>
+    <p class="standfirst">Adding wells makes total rate rise. No decline curve can fit that, so the regression gives up and reports a straight exponential with a recovery estimate to match.</p>
+    <div class="costline">R&#178; falls from 0.98 to 0.15.<br>Recovery misread by a factor.</div>
+  </section>
+
+  <div class="block">
+    <div class="rail"><b>Mechanism</b><span>Why it happens</span></div>
+    <div class="col prose">
+
+      <p>
+        An Arps decline curve describes one well depleting one drainage volume.
+        It assumes rate only ever falls. Field rate is not that. It is the sum of
+        wells at different ages, and it steps upward every time a new well is
+        turned to sales.
+      </p>
+      <p>
+        Point a least-squares fit at that series and it has no good options. It
+        cannot bend a decline curve upward, so it flattens the curve until the
+        residuals on either side of the step roughly cancel. The hyperbolic
+        exponent is driven to zero, which is a straight exponential, and the
+        initial decline comes back far shallower than any individual well
+        actually exhibits. The fitted curve is not a bad description of the
+        reservoir. It is not a description of the reservoir at all.
+      </p>
+      <p>
+        The reason it survives review is that the output still looks like a
+        decline curve. It has an initial rate, a decline rate and a recovery
+        number, all in the units everyone expects. Nothing about the printed
+        answer says the regression failed.
+      </p>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="rail"><b>Detection</b><span>Test your own model</span></div>
+    <div class="col prose">
+
+      <p>
+        Three checks, in order of how quickly they settle the question.
+      </p>
+      <p>
+        <b>Look for the step.</b> Plot rate against time for the whole history
+        and mark every date a well was turned to sales. If the rate rises after
+        any of those dates, a single curve cannot fit the series and whatever was
+        fitted to it is meaningless.
+      </p>
+      <p>
+        <b>Ask for the quality measure.</b> A decline fit reported without its
+        coefficient of determination is a decline fit somebody chose not to look
+        at. Field-rate fits on a growing pad routinely land below 0.3. A clean
+        per-well fit on the same data lands above 0.95.
+      </p>
+      <p>
+        <b>Check the exponent.</b> If the hyperbolic exponent came back at
+        exactly zero, or pinned to whichever bound the solver was given, the
+        solver hit a wall rather than found an answer. Real tight oil wells sit
+        near one, and often above it early in life.
+      </p>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="rail"><b>The fix</b><span>What to do instead</span></div>
+    <div class="col prose">
+
+      <p>
+        <b>Normalise to rate per producing well.</b> Divide by the count of wells
+        actually online in each month, not the count drilled. Adding wells then
+        stops looking like a reservoir doing something impossible.
+      </p>
+      <p>
+        <b>Segment at each step change.</b> Wells brought online two years apart
+        are different vintages with different completions. Fit them separately
+        and let the model add them, rather than asking one curve to describe
+        both.
+      </p>
+      <p>
+        <b>Drop the flowback month.</b> The first partial month is choked,
+        cleaning up, and not on the depletion trend that governs the rest of the
+        life.
+      </p>
+      <p>
+        <b>Fit on the logarithm of rate.</b> Production spans two orders of
+        magnitude across a well's life. A fit on raw rate is dominated by the
+        first six months and effectively ignores the tail, which is exactly where
+        the reserve lives.
+      </p>
+      <p>
+        <b>Validate against something independent.</b> Build a type curve from
+        offset wells in the same interval and compare recoveries. Agreement
+        inside a few percent means the fit is describing rock rather than
+        arithmetic.
+      </p><p style="margin-top:26px;"><a href="/contact/">An Asset Health Check</a> finds this one on a producing asset in two weeks, fixed fee.</p>
+    </div>
+  </div>
+
+  <div class="block">
+    <div class="rail"><b>More</b><span>Redline list</span></div>
+    <div class="col">
+      <div class="pager"><span></span><a href="/findings/decline-quoted-on-the-wrong-basis/" style="text-align:right;"><span class="dir">Next</span>Decline quoted on the wrong basis</a></div>
+    </div>
+  </div>
+
+  <div class="block" style="border-top:none; padding-top: 8px;">
+    <div class="rail"><b>Next</b><span>Start here</span></div>
+    <div class="col">
+      <div class="cta">
+        <div>
+          <h2>Send us one asset and two spreadsheets.</h2>
+          <p>
+            The Asset Health Check is the cheapest possible way to find out
+            whether we are worth the larger engagement. Two weeks, fixed fee,
+            and a written answer either way.
+          </p>
+        </div>
+        <a class="btn" href="/contact/">Book a scoping call</a>
+      </div>
+    </div>
+  </div>
+
+  <footer class="colophon">
+    <span>Gossans &middot; Extraction economics and production optimisation</span>
+    <button class="theme-btn" type="button" id="theme">Light / dark</button>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById("theme");
+  if (!btn) return;
+  btn.addEventListener("click", function () {
+    var root = document.documentElement;
+    var now = root.getAttribute("data-theme");
+    var dark = now
+      ? now === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    root.setAttribute("data-theme", dark ? "light" : "dark");
+  });
+})();
+</script>
+</body>
+</html>
