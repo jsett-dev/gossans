@@ -797,6 +797,29 @@ ABOUT_BODY = """
   </div>
 
   <div class="block">
+    <div class="rail"><b>Location</b><span>Where we work from</span></div>
+    <div class="col prose">
+      <p>
+        Gossans works from the Powder River Basin, not from Houston or Denver.
+      </p>
+      <p>
+        That matters more than a mailing address usually does, because of how
+        these engagements actually run. The costing workshop is the step that
+        decides whether an opportunity list is worth anything, since the price
+        and the odds on every line come from the crew who would execute it rather
+        than from an assumption somebody typed into a spreadsheet. Being a drive
+        away rather than a flight and a hotel turns that from a production into a
+        half day.
+      </p>
+      <p>
+        It also means the regulators, operators and service companies whose
+        public filings feed two thirds of our data request are the ones on our
+        doorstep, in our time zone, filing with agencies we read every week.
+      </p>
+    </div>
+  </div>
+
+  <div class="block">
     <div class="rail"><b>Independence</b><span>Why it matters</span></div>
     <div class="col prose">
       <p>
@@ -948,8 +971,9 @@ def build_pages():
         "title": "About Gossans",
         "description": (
             "Gossans is led by Jonathan Settelmeyer, a University of Wyoming petroleum "
-            "engineer. Who does the work, why independence matters when a model "
-            "disagrees with yours, and how client data is handled."
+            "engineer working from the Powder River Basin. Who does the work, why "
+            "independence matters when a model disagrees with yours, and how client "
+            "data is handled."
         ),
         "kicker": "Who does the work",
         "priority": "0.9",
