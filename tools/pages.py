@@ -800,21 +800,29 @@ ABOUT_BODY = """
     <div class="rail"><b>Location</b><span>Where we work from</span></div>
     <div class="col prose">
       <p>
-        Gossans works from the Powder River Basin, not from Houston or Denver.
+        Gossans works from <b>Gillette, Wyoming</b>, in the Powder River Basin.
+        Not from Houston, and not from Denver.
       </p>
       <p>
-        That matters more than a mailing address usually does, because of how
-        these engagements actually run. The costing workshop is the step that
+        Gillette sits inside both halves of what this practice covers. The
+        largest coal mines in the United States are a short drive out of town,
+        and the oil and coalbed gas of the basin are underneath it. The
+        comparison this site keeps insisting on, between a mine and a well valued
+        on one basis, is a local question here rather than a theoretical one.
+      </p>
+      <p>
+        That proximity matters more than a mailing address usually does, because
+        of how these engagements run. The costing workshop is the step that
         decides whether an opportunity list is worth anything, since the price
-        and the odds on every line come from the crew who would execute it rather
-        than from an assumption somebody typed into a spreadsheet. Being a drive
-        away rather than a flight and a hotel turns that from a production into a
-        half day.
+        and the odds on every line have to come from the crew who would execute
+        it rather than from an assumption somebody typed into a spreadsheet.
+        Being a drive away rather than a flight and a hotel turns that from a
+        production into a half day.
       </p>
       <p>
         It also means the regulators, operators and service companies whose
-        public filings feed two thirds of our data request are the ones on our
-        doorstep, in our time zone, filing with agencies we read every week.
+        public filings feed two thirds of our data request are on our doorstep,
+        in our time zone, filing with agencies we read every week.
       </p>
     </div>
   </div>
@@ -884,6 +892,18 @@ CONTACT_BODY = """
   </div>
 
   <div class="block">
+    <div class="rail"><b>Where</b><span>Based in the basin</span></div>
+    <div class="col prose">
+      <p>
+        Gillette, Wyoming, in the Powder River Basin. Work is remote by default
+        and most engagements never need a visit, but the costing workshop is
+        better in a room, and for an asset in this basin that is a drive rather
+        than a trip.
+      </p>
+    </div>
+  </div>
+
+  <div class="block">
     <div class="rail"><b>Process</b><span>What happens next</span></div>
     <div class="col prose">
       <p>
@@ -939,6 +959,41 @@ CONTACT_BODY = """
 """
 
 
+ORG_SCHEMA = """{
+  "@context": "https://schema.org",
+  "@type": "ProfessionalService",
+  "name": "Gossans",
+  "url": "https://www.gossans.com/",
+  "description": "Fixed-fee extraction economics and production optimisation. Assets rebuilt as one auditable economic model, fitted to outturn, with opportunities ranked on risked value.",
+  "founder": {
+    "@type": "Person",
+    "name": "Jonathan Settelmeyer",
+    "jobTitle": "Principal",
+    "alumniOf": {
+      "@type": "CollegeOrUniversity",
+      "name": "University of Wyoming"
+    }
+  },
+  "address": {
+    "@type": "PostalAddress",
+    "addressLocality": "Gillette",
+    "addressRegion": "WY",
+    "addressCountry": "US"
+  },
+  "areaServed": {
+    "@type": "Place",
+    "name": "United States"
+  },
+  "knowsAbout": [
+    "Reservoir engineering",
+    "Decline curve analysis",
+    "Mine planning",
+    "Project economics",
+    "Reserves evaluation"
+  ]
+}"""
+
+
 def build_pages():
     total = len(FINDINGS)
     pages = []
@@ -971,13 +1026,14 @@ def build_pages():
         "title": "About Gossans",
         "description": (
             "Gossans is led by Jonathan Settelmeyer, a University of Wyoming petroleum "
-            "engineer working from the Powder River Basin. Who does the work, why "
+            "engineer working from Gillette, Wyoming. Who does the work, why "
             "independence matters when a model disagrees with yours, and how client "
             "data is handled."
         ),
-        "kicker": "Who does the work",
+        "kicker": "Gillette, Wyoming",
         "priority": "0.9",
         "body": ABOUT_BODY,
+        "schema": ORG_SCHEMA,
     })
 
     pages.append({
@@ -985,9 +1041,10 @@ def build_pages():
         "title": "Contact Gossans",
         "description": (
             "A forty-five minute scoping call at no charge, followed by a written "
-            "fixed-fee scope. Nothing is requested until both are agreed."
+            "fixed-fee scope. Extraction economics from Gillette, Wyoming. Nothing is "
+            "requested until both are agreed."
         ),
-        "kicker": "Scoping call, no charge",
+        "kicker": "Gillette, Wyoming",
         "priority": "0.9",
         "body": CONTACT_BODY,
     })
