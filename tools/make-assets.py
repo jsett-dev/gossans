@@ -28,7 +28,7 @@ MUTED = (179, 186, 184)     # --ink-2 dark
 DRAFT = (107, 163, 198)     # --draft dark
 RULE = (45, 53, 56)         # --rule dark
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent / "public"
 
 #: Tried in order. Arial is on every Windows machine; the rest cover macOS and
 #: Linux so the script is not silently Windows-only.

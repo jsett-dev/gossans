@@ -3,17 +3,19 @@
 The Gossans website. One static page, no build step, no dependencies.
 
 ```
-index.html      the site: markup, styles and one small script, all inline
-404.html        not-found page, styled to match
-favicon.svg     the rust square mark
-favicon.ico     raster fallback, 16 through 64px
-apple-touch-icon.png  180x180 home-screen icon
-og-image.png    1200x630 social share card
-tools/          regenerates the three raster assets above
-robots.txt      crawler policy
-sitemap.xml     one URL, update if pages are added
-CNAME           custom domain, read by GitHub Pages only
-.nojekyll       stops GitHub Pages running Jekyll over the files
+public/                 everything that gets served
+  index.html            the site: markup, styles and one small script, all inline
+  404.html              not-found page, styled to match
+  favicon.svg           the rust square mark
+  favicon.ico           raster fallback, 16 through 64px
+  apple-touch-icon.png  180x180 home-screen icon
+  og-image.png          1200x630 social share card
+  robots.txt            crawler policy
+  sitemap.xml           one URL, update if pages are added
+wrangler.toml           Cloudflare config: upload public/ as static assets
+tools/                  regenerates the three raster assets above
+CNAME                   custom domain, read by GitHub Pages only
+.nojekyll               stops GitHub Pages running Jekyll over the files
 ```
 
 Everything is deliberately in one file. There is no framework, no bundler and
@@ -22,7 +24,7 @@ only external requests are three fonts from Google Fonts.
 
 ## Regenerating the images
 
-`favicon.svg` is hand-written. The three raster assets are generated from the
+`public/favicon.svg` is hand-written. The three raster assets are generated from the
 brand colours so they cannot drift out of step with the site:
 
 ```bash
@@ -35,7 +37,7 @@ and nothing else will produce these files at deploy time.
 ## Preview it locally
 
 ```bash
-python -m http.server 8000
+python -m http.server 8000 -d public
 ```
 
 Then open `http://localhost:8000`. Opening `index.html` directly as a file also
@@ -44,7 +46,7 @@ it is served.
 
 ## Editing
 
-Everything the reader sees is in `index.html`, and the sections are marked with
+Everything the reader sees is in `public/index.html`, and the sections are marked with
 comment rules in the order they appear on the page.
 
 | To change | Look for |

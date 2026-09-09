@@ -1,0 +1,9 @@
+# Cloudflare Workers config. The site is static, so there is no Worker script:
+# `public/` is uploaded as assets and served directly.
+
+name = "gossans"
+compatibility_date = "2026-09-09"
+
+[assets]
+directory = "./public"
+not_found_handling = "404-page"
