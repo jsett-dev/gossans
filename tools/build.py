@@ -89,6 +89,7 @@ HEAD = """<!doctype html>
         <span class="kicker">{kicker}</span>
       </div>
       <nav class="topnav">
+        <a href="/basin-model/">Model</a>
         <a href="/powder-river-basin/">Study</a>
         <a href="/findings/">Findings</a>
         <a href="/about/">About</a>

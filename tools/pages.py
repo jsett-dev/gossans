@@ -989,6 +989,17 @@ def build_pages():
     total = len(FINDINGS)
     pages = []
 
+    import model_page
+
+    pages.append({
+        "url": "/basin-model/",
+        "title": "%s | Gossans" % model_page.TITLE,
+        "description": model_page.DESCRIPTION,
+        "kicker": "Interactive model",
+        "priority": "1.0",
+        "body": model_page.BODY,
+    })
+
     pages.append({
         "url": "/powder-river-basin/",
         "title": "%s | Gossans" % study_prb.TITLE,
