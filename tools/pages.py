@@ -984,8 +984,19 @@ ORG_SCHEMA = """{
 
 
 def build_pages():
+    import study_prb
+
     total = len(FINDINGS)
     pages = []
+
+    pages.append({
+        "url": "/powder-river-basin/",
+        "title": "%s | Gossans" % study_prb.TITLE,
+        "description": study_prb.DESCRIPTION,
+        "kicker": "Study &middot; Converse County, Wyoming",
+        "priority": "1.0",
+        "body": study_prb.BODY,
+    })
 
     pages.append({
         "url": "/findings/",
