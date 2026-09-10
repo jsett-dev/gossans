@@ -703,10 +703,12 @@ img, svg, video { max-width: 100%; height: auto; }
       <div id="leaflet" class="leafwrap"></div>
       <div class="legend" id="maplegend"></div>
       <p class="prose" style="color:var(--ink-2); margin-top:14px; font-size:14px;">
-        Hollow circles are wells we hold production for but will not put a
-        recovery number on, because the fit was refused. They are drawn rather
-        than dropped: a map that shows only the wells that behaved is a map
-        that has quietly chosen its own evidence.
+        Filled circles carry a number. Dashed circles are wells whose decline
+        fit was refused, so we will not claim a recovery for them. Plain hollow
+        circles are wells with a sound fit that simply cannot be normalised,
+        because the perforated interval was never filed. All three are drawn:
+        a map showing only the wells that behaved is a map that has quietly
+        chosen its own evidence.
       </p>
     </div>
   </div>
@@ -1038,9 +1040,17 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       var p = f.properties, c = f.geometry.coordinates;
       var v = p[mapView.k];
       var style;
-      if (mapView.k === "none" || !p.sound || !v) {
-        // A well we hold but will not value. Drawn hollow, never dropped.
-        style = {radius:3, color:"#8a8f8c", weight:1, fill:false, opacity:0.75};
+      // Three states, and they are not the same thing. A refused fit is a well
+      // we decline to value. A missing measure is a well we cannot normalise
+      // because its perforated interval was never filed. Calling the second
+      // one "refused" would be the same lie the grid used to tell.
+      if (mapView.k === "none") {
+        style = {radius:3.5, color:"#6f7472", weight:1, fill:false, opacity:0.8};
+      } else if (!p.sound) {
+        style = {radius:3, color:"#b0574a", weight:1.1, fill:false,
+                 opacity:0.75, dashArray:"2,2"};
+      } else if (!v) {
+        style = {radius:3, color:"#8a8f8c", weight:1, fill:false, opacity:0.6};
       } else {
         var t = Math.max(0, Math.min(1, (v-lo)/((hi-lo)||1)));
         style = {radius:4.5, color:"#00000022", weight:1,
@@ -1076,8 +1086,20 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
         parts.push('<span><i class="sw" style="border-radius:50%;width:12px;'+
           'background:'+shade(t)+'"></i>'+Math.round(v).toLocaleString()+'</span>');
       }
+      var refused = wellData.features.filter(function(f){
+        return !f.properties.sound; }).length;
+      var nomeasure = wellData.features.filter(function(f){
+        return f.properties.sound && !f.properties[mapView.k]; }).length;
       parts.push('<span><i class="sw" style="border-radius:50%;width:12px;'+
-        'background:transparent;border-color:#8a8f8c"></i>fit refused, not valued</span>');
+        'background:transparent;border:1px dashed #b0574a"></i>fit refused ('+
+        refused.toLocaleString()+')</span>');
+      if (nomeasure) {
+        var why = (mapView.k === "perft")
+          ? "no perforated interval filed" : "no recovery figure";
+        parts.push('<span><i class="sw" style="border-radius:50%;width:12px;'+
+          'background:transparent;border-color:#8a8f8c"></i>'+why+' ('+
+          nomeasure.toLocaleString()+')</span>');
+      }
       parts.push('<span style="color:var(--ink-3)">'+mapView.unit+'</span>');
       L2.innerHTML = parts.join("");
     }
