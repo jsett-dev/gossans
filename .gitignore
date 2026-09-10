@@ -19,5 +19,7 @@ dist/
 # Python
 __pycache__/
 *.pyc
-data/basin.json
-data/wells.geojson
+
+# The generated data files under public/data are deployed content, not build
+# scratch. The site is served from git, so they have to be committed. Rebuild
+# them with scripts/export_geology.py in the gossans-data repository.
