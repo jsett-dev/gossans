@@ -751,16 +751,14 @@ ABOUT_BODY = """
     <div class="rail"><b>Principal</b><span>Who does the work</span></div>
     <div class="col prose">
       <p>
-        Gossans is led by <b>Jonathan Settelmeyer</b>, who holds a Bachelor of
-        Science in Petroleum Engineering from the University of Wyoming, with a
-        concentration in unconventional resources, taken in 2018.
+        Gossans is a single-principal practice led by a petroleum engineer.
       </p>
       <p>
-        That concentration is where most of this site comes from. Hyperbolic
-        decline behaviour, the gap between a fit to per-well rate and a fit to
-        field rate, and the reason a type curve entered on the wrong basis stays
-        wrong for the life of a forecast are not incidental interests here. They
-        are the subject.
+        Hyperbolic decline behaviour, the gap between a fit to per-well rate and
+        a fit to field rate, and the reason a type curve entered on the wrong
+        basis stays wrong for the life of a forecast are not incidental
+        interests here. They are the subject, and the published work is there to
+        be checked rather than taken on trust.
       </p>
       <p>
         The person who takes the scoping call is the person who builds the model
@@ -965,15 +963,6 @@ ORG_SCHEMA = """{
   "name": "Gossans",
   "url": "https://www.gossans.com/",
   "description": "Fixed-fee production outlook simulation and opportunity screening. Assets simulated on one basis, fitted to outturn, with every option ranked on risked value.",
-  "founder": {
-    "@type": "Person",
-    "name": "Jonathan Settelmeyer",
-    "jobTitle": "Principal",
-    "alumniOf": {
-      "@type": "CollegeOrUniversity",
-      "name": "University of Wyoming"
-    }
-  },
   "address": {
     "@type": "PostalAddress",
     "addressLocality": "Gillette",
@@ -1025,10 +1014,8 @@ def build_pages():
         "url": "/about/",
         "title": "About Gossans",
         "description": (
-            "Gossans is led by Jonathan Settelmeyer, a University of Wyoming petroleum "
-            "engineer working from Gillette, Wyoming. Who does the work, why "
-            "independence matters when a model disagrees with yours, and how client "
-            "data is handled."
+            "How the practice works, why independence matters when a model disagrees "
+            "with yours, and how client data is handled."
         ),
         "kicker": "Gillette, Wyoming",
         "priority": "0.9",
