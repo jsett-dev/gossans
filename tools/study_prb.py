@@ -98,19 +98,22 @@ BODY = """
       <h2>The raw ranking and the honest ranking are different.</h2>
       <p class="prose" style="color:var(--ink-2); margin-bottom:22px;">
         Median estimated recovery per well, and the same figure divided by
-        perforated length. Wells with under a thousand feet of perforation are
-        excluded from the second column, because a vertical completion returns a
-        ratio in the millions and that is arithmetic rather than geology.
+        lateral length. Where a directional survey is on file the lateral is
+        measured from it; otherwise the perforated interval stands in, and on
+        the wells that have both the two agree at the median to within two
+        percent. Wells with under a thousand feet are excluded from the second
+        column, because a vertical completion returns a ratio in the millions
+        and that is arithmetic rather than geology.
       </p>
       <div class="tbl">
         <table>
           <tr><th>Formation</th><th>Wells</th><th>Median recovery, bbl</th><th>Per 1,000 ft</th></tr>
-          <tr><td>Niobrara</td><td>436</td><td>414,225</td><td>46,269</td></tr>
+          <tr><td>Niobrara</td><td>442</td><td>414,783</td><td>45,448</td></tr>
           <tr><td>Turner</td><td>255</td><td>325,713</td><td><b>50,604</b></td></tr>
-          <tr><td>Parkman</td><td>109</td><td>339,260</td><td>43,451</td></tr>
-          <tr><td>Sussex</td><td>101</td><td>223,342</td><td>41,721</td></tr>
-          <tr><td>Frontier</td><td>92</td><td>273,860</td><td>36,624</td></tr>
-          <tr><td>Teapot</td><td>60</td><td>325,103</td><td>32,816</td></tr>
+          <tr><td>Parkman</td><td>125</td><td>307,848</td><td>43,451</td></tr>
+          <tr><td>Sussex</td><td>101</td><td>223,342</td><td>40,899</td></tr>
+          <tr><td>Frontier</td><td>97</td><td>273,860</td><td>33,294</td></tr>
+          <tr><td>Teapot</td><td>77</td><td>277,070</td><td>32,922</td></tr>
         </table>
       </div>
       <div class="prose">
@@ -164,26 +167,27 @@ BODY = """
       <div class="tbl">
         <table>
           <tr><th>Completion year</th><th>Wells</th><th>Extra lb per ft</th><th>Extra bbl per ft</th><th>Pounds per extra barrel</th></tr>
-          <tr><td>2012</td><td>27</td><td>428</td><td>14.5</td><td>30</td></tr>
-          <tr><td>2013</td><td>56</td><td>312</td><td>&minus;1.2</td><td><b>no gain</b></td></tr>
+          <tr><td>2012</td><td>36</td><td>408</td><td>3.2</td><td>129</td></tr>
+          <tr><td>2013</td><td>58</td><td>298</td><td>&minus;0.5</td><td><b>no gain</b></td></tr>
+          <tr><td>2014</td><td>40</td><td>509</td><td>&minus;14.9</td><td><b>no gain</b></td></tr>
           <tr><td>2020</td><td>31</td><td>1,065</td><td>&minus;0.7</td><td><b>no gain</b></td></tr>
           <tr><td>2021</td><td>41</td><td>742</td><td>3.0</td><td>245</td></tr>
           <tr><td>2022</td><td>96</td><td>1,625</td><td>11.6</td><td>140</td></tr>
           <tr><td>2023</td><td>99</td><td>1,198</td><td>8.6</td><td>140</td></tr>
-          <tr><td>2024</td><td>115</td><td>1,736</td><td>17.4</td><td>100</td></tr>
+          <tr><td>2024</td><td>115</td><td>1,736</td><td>17.9</td><td>97</td></tr>
         </table>
       </div>
       <div class="prose">
         <p>
-          Weighted across cohorts, an extra barrel costs about 129 pounds of
-          extra proppant. Recovery scales with roughly the quarter power of
-          intensity, so the response is real, consistent, and nowhere close to
-          proportional.
+          Weighted across cohorts, an extra barrel costs about 163 pounds of
+          extra proppant. In the recent cohorts recovery scales with roughly
+          the quarter power of intensity, so the response is real, consistent,
+          and nowhere close to proportional.
         </p>
         <p>
-          Two cohorts bought nothing at all. In 2013 and 2020 the heavier half
-          recovered marginally less per foot than the lighter half, despite
-          pumping substantially more sand.
+          Three cohorts bought nothing at all. In 2013, 2014 and 2020 the
+          heavier half recovered less per foot than the lighter half, despite
+          pumping more sand, and in 2014 it was not close.
         </p>
       </div>
     </div>
