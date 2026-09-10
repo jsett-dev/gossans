@@ -15,6 +15,12 @@ DESCRIPTION = (
     "range, with every gap in the record left visible."
 )
 
+HEAD_EXTRA = """
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script defer
+        src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>"""
+
 BODY = r"""
   <section class="thesis article">
     <div class="crumb">Model &middot; Powder River Basin</div>
@@ -27,6 +33,21 @@ BODY = r"""
     </p>
     <div class="costline" id="hdr">Loading the basin&hellip;</div>
   </section>
+
+  <div class="block">
+    <div class="rail"><b>Map</b><span>Every well we hold</span></div>
+    <div class="col">
+      <div class="ctl"><div class="ctlgrp" id="mapviews"></div></div>
+      <div id="leaflet" class="leafwrap"></div>
+      <div class="legend" id="maplegend"></div>
+      <p class="prose" style="color:var(--ink-2); margin-top:14px; font-size:14px;">
+        Hollow circles are wells we hold production for but will not put a
+        recovery number on, because the fit was refused. They are drawn rather
+        than dropped: a map that shows only the wells that behaved is a map
+        that has quietly chosen its own evidence.
+      </p>
+    </div>
+  </div>
 
   <div class="block">
     <div class="rail"><b>Model</b><span>Township and range</span></div>
@@ -101,6 +122,11 @@ BODY = r"""
 .ctlgrp button:hover { border-color:var(--rust); color:var(--ink); }
 .ctlgrp button[aria-pressed="true"] { background:var(--rust); border-color:var(--rust);
   color:#fff; }
+.leafwrap { height:520px; border:1px solid var(--rule); background:var(--paper-2); }
+.leafwrap .leaflet-container { background:var(--paper-2); font-family:var(--f-data); }
+.leafwrap .leaflet-popup-content { font-family:var(--f-data); font-size:12px;
+  line-height:1.7; }
+.leafwrap .leaflet-control-attribution { font-size:9px; }
 .mapwrap { overflow-x:auto; border:1px solid var(--rule); background:var(--paper-2); }
 .mapwrap svg { display:block; width:100%; min-width:620px; height:auto; }
 .legend { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px;
@@ -308,6 +334,104 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     });
   }
 
+  // ------------------------------------------------------------ the map
+  var MAPVIEWS = [
+    {k:"perft", label:"Recovery per 1,000 ft", unit:"bbl"},
+    {k:"eur",   label:"Recovery per well",     unit:"bbl"},
+    {k:"none",  label:"Just the wells",        unit:""}
+  ];
+  var mapView = MAPVIEWS[0], lmap = null, layer = null, wellData = null;
+
+  function startMap(){
+    if (typeof L === "undefined") { return setTimeout(startMap, 200); }
+    lmap = L.map("leaflet", {scrollWheelZoom:false});
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 15, minZoom: 6,
+      attribution: 'Basemap &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. ' +
+                   'Wells: Wyoming Oil and Gas Conservation Commission.'
+    }).addTo(lmap);
+    fetch("/data/wells.geojson").then(function(r){ return r.json(); })
+      .then(function(gj){ wellData = gj; mapControls(); paintMap(); })
+      .catch(function(e){
+        document.getElementById("maplegend").textContent =
+          "Could not load the well locations: " + e;
+      });
+  }
+
+  function paintMap(){
+    if (!wellData || !lmap) return;
+    if (layer) lmap.removeLayer(layer);
+
+    var vals = wellData.features
+      .map(function(f){ return f.properties[mapView.k]; })
+      .filter(function(v){ return v; })
+      .sort(function(a,b){ return a-b; });
+    // Clip at the tenth and ninetieth so a couple of outliers do not flatten
+    // the whole scale into one colour.
+    var lo = vals.length ? vals[Math.floor(vals.length*0.1)] : 0;
+    var hi = vals.length ? vals[Math.floor(vals.length*0.9)] : 1;
+
+    layer = L.layerGroup();
+    wellData.features.forEach(function(f){
+      var p = f.properties, c = f.geometry.coordinates;
+      var v = p[mapView.k];
+      var style;
+      if (mapView.k === "none" || !p.sound || !v) {
+        // A well we hold but will not value. Drawn hollow, never dropped.
+        style = {radius:3, color:"#8a8f8c", weight:1, fill:false, opacity:0.75};
+      } else {
+        var t = Math.max(0, Math.min(1, (v-lo)/((hi-lo)||1)));
+        style = {radius:4.5, color:"#00000022", weight:1,
+                 fillColor:shade(t), fill:true, fillOpacity:0.92};
+      }
+      var m = L.circleMarker([c[1], c[0]], style);
+      m.bindPopup(
+        "<b>" + (p.name || p.api) + "</b><br>" +
+        (p.op || "operator not filed") + "<br>" +
+        (p.trs ? p.trs + " &middot; " : "") + (p.co ? p.co + " County" : "") + "<br>" +
+        (p.fm ? "Producing from " + p.fm + "<br>" : "") +
+        (p.sound
+          ? ((p.eur ? "Recovery " + p.eur.toLocaleString() + " bbl<br>" : "") +
+             (p.perft ? p.perft.toLocaleString() + " bbl per 1,000 ft<br>" : ""))
+          : "<i>Fit refused. No recovery number is claimed for this well.</i><br>") +
+        "<span style='color:#777'>API " + p.api + "</span>");
+      layer.addLayer(m);
+    });
+    layer.addTo(lmap);
+
+    var pts = wellData.features.map(function(f){
+      return [f.geometry.coordinates[1], f.geometry.coordinates[0]]; });
+    if (pts.length) lmap.fitBounds(pts, {padding:[20,20]});
+
+    var L2 = document.getElementById("maplegend");
+    if (mapView.k === "none") {
+      L2.innerHTML = '<span>' + wellData.features.length.toLocaleString() +
+        ' wells, all drawn the same</span>';
+    } else {
+      var parts = [];
+      for (var i=0;i<5;i++){
+        var t=i/4, v=lo+(hi-lo)*t;
+        parts.push('<span><i class="sw" style="border-radius:50%;width:12px;'+
+          'background:'+shade(t)+'"></i>'+Math.round(v).toLocaleString()+'</span>');
+      }
+      parts.push('<span><i class="sw" style="border-radius:50%;width:12px;'+
+        'background:transparent;border-color:#8a8f8c"></i>fit refused, not valued</span>');
+      parts.push('<span style="color:var(--ink-3)">'+mapView.unit+'</span>');
+      L2.innerHTML = parts.join("");
+    }
+  }
+
+  function mapControls(){
+    var v = document.getElementById("mapviews"); v.innerHTML = "";
+    MAPVIEWS.forEach(function(o){
+      var b = document.createElement("button");
+      b.textContent = o.label;
+      b.setAttribute("aria-pressed", o === mapView);
+      b.onclick = function(){ mapView = o; mapControls(); paintMap(); };
+      v.appendChild(b);
+    });
+  }
+
   fetch("/data/basin.json").then(function(r){ return r.json(); }).then(function(j){
     data=j;
     $("hdr").innerHTML = j.wells_total.toLocaleString()+" wells &middot; "+
@@ -319,7 +443,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     formation=Object.keys(names).sort()[0]||null;
     $("unknown").innerHTML=(j.unknown||[]).map(function(u){
       return "<li>"+u+"</li>";}).join("");
-    controls(); draw(); strat(); bars();
+    controls(); draw(); strat(); bars(); startMap();
   }).catch(function(e){
     $("hdr").textContent="Could not load the basin data: "+e;
   });

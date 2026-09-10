@@ -998,6 +998,7 @@ def build_pages():
         "kicker": "Interactive model",
         "priority": "1.0",
         "body": model_page.BODY,
+        "head_extra": model_page.HEAD_EXTRA,
     })
 
     pages.append({

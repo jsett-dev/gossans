@@ -74,7 +74,7 @@ HEAD = """<!doctype html>
 
 {fonts}
 
-{style}{schema}
+{style}{schema}{head_extra}
 </head>
 <body>
 <div class="sheet">
@@ -193,6 +193,7 @@ def render(page):
         fonts=FONTS,
         style=STYLE + EXTRA_CSS,
         schema=schema,
+        head_extra=page.get("head_extra", ""),
         kicker=page.get("kicker", "Production outlook simulation &amp; screening"),
     )
     return head + page["body"] + FOOT.format(script=SCRIPT)
