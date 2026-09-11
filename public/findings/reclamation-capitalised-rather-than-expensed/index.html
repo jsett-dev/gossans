@@ -243,6 +243,29 @@ header.plate { padding: 72px 0 0; }
   padding: 64px 0 60px;
   border-bottom: 1px solid var(--rule);
 }
+/* The opening statement sits over 378 real production histories, rate per
+   producing day on a log scale, with the median in copper. It is decoration
+   and evidence at once, which is the only kind of decoration this site should
+   carry. Regenerate with scripts/make_signature.py in the data repository. */
+.thesis { position: relative; }
+.thesis .field {
+  position: absolute;
+  inset: -28px -6vw auto -6vw;
+  height: 460px;
+  background: url("/curves.svg") center top / 100% 100% no-repeat;
+  opacity: .55;
+  pointer-events: none;
+  z-index: 0;
+}
+.thesis > *:not(.field) { position: relative; z-index: 1; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .thesis .field { opacity: .42; }
+}
+:root[data-theme="dark"] .thesis .field { opacity: .42; }
+@media (max-width: 700px) {
+  .thesis .field { inset: -16px -20px auto -20px; height: 340px; opacity: .4; }
+}
+
 .thesis h1 {
   font-size: clamp(42px, 6.6vw, 82px);
   font-weight: 700;
