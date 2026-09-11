@@ -8,8 +8,9 @@ that does not fit on a sales page.
 """
 
 CTA_LINE = (
-    '<p style="margin-top:26px;"><a href="/contact/">An Asset Health Check</a> '
-    "finds this one on a producing asset in two weeks, fixed fee.</p>"
+    '<p style="margin-top:26px;">Found on Wyoming public records, and '
+    'published here as research. Gossans is not yet trading, and '
+    '<a href="/contact/">corrections</a> are more use than enquiries.</p>'
 )
 
 
@@ -761,7 +762,7 @@ ABOUT_BODY = """
         be checked rather than taken on trust.
       </p>
       <p>
-        The person who takes the scoping call is the person who builds the model
+        The person who answers the email is the person who builds the model
         and presents the finding. Nothing is handed to an analyst you have not
         met. That is a deliberate limit on how much work we take, and it is the
         reason a two-week engagement is two weeks rather than a quarter.
@@ -837,7 +838,7 @@ ABOUT_BODY = """
       <p>
         When our model disagrees with yours, that disagreement is the deliverable.
         We would rather tell you the project is worth less than you thought and
-        not be hired again than tell you what the scoping call suggested you
+        not be hired again than tell you what the first conversation suggested you
         wanted to hear.
       </p>
     </div>
@@ -861,100 +862,86 @@ ABOUT_BODY = """
   </div>
 """
 
-# TODO, needs Jonathan: a direct booking link beside the email address, plus
-# a phone number and a city. Buyers of technical work check that a firm is
-# somewhere real, and a booking link removes a round trip.
 CONTACT_BODY = """
   <section class="thesis article">
-    <div class="crumb">Contact &middot; Scoping call</div>
-    <h1>Forty-five minutes, and we will tell you if we are the wrong people.</h1>
+    <div class="crumb">Contact</div>
+    <h1>There is nothing to buy here yet, and two good reasons to write.</h1>
     <p class="standfirst">
-      The first two steps of any engagement cost nothing. If the answer is that
-      your model is fine, or that the decision in front of you does not need a
-      model, you will hear that instead of a proposal.
+      Gossans is a research project built on Wyoming's public records. The
+      company is not formed and no services are offered, so this page is not a
+      sales channel. It is an address.
     </p>
   </section>
 
   <div class="block">
-    <div class="rail"><b>Start</b><span>Get in touch</span></div>
+    <div class="rail"><b>Write</b><span>Two reasons</span></div>
     <div class="col prose">
       <p>
-        Email is the fastest route. Tell us what the asset is, what decision is
-        pending, and roughly when it has to be made. You do not need to prepare
-        anything or send data to have the first conversation.
+        <b>You found something wrong.</b> This is the more valuable of the two.
+        Everything published here is computed from state filings, and those
+        filings contain errors that the analysis will faithfully carry. If a
+        well, a section or a formation is described here in a way you know to
+        be wrong, that is worth more than any compliment and it will be
+        corrected and credited.
       </p>
-      <p style="margin-top:24px;">
-        <a class="btn" href="mailto:hello@gossans.com?subject=Scoping%20call">hello@gossans.com</a>
+      <p>
+        <b>You own minerals in the basin and want to know when this opens.</b>
+        Say so and you will be told once, when there is something to tell. No
+        list, no newsletter, no follow-up.
+      </p>
+      <p style="margin-top:28px;">
+        <a class="btn" href="mailto:hello@gossans.com">hello@gossans.com</a>
       </p>
     </div>
   </div>
 
   <div class="block">
-    <div class="rail"><b>Where</b><span>Based in the basin</span></div>
+    <div class="rail"><b>Where</b><span>In the basin</span></div>
     <div class="col prose">
       <p>
-        Gillette, Wyoming, in the Powder River Basin. Work is remote by default
-        and most engagements never need a visit, but the costing workshop is
-        better in a room, and for an asset in this basin that is a drive rather
-        than a trip.
+        Gillette, Wyoming, in the Powder River Basin. The wells on these pages
+        are a drive away rather than an abstraction, which is the reason this
+        basin was the one built first.
       </p>
     </div>
   </div>
 
   <div class="block">
-    <div class="rail"><b>Process</b><span>What happens next</span></div>
+    <div class="rail"><b>Open</b><span>What is unresolved</span></div>
     <div class="col prose">
       <p>
-        <b>Scoping call, forty-five minutes, no charge.</b> What the asset is,
-        what decision is pending, and whether we are the right people for it. We
-        will say so if we are not.
+        Two questions decide what this can lawfully offer and neither is
+        settled. Whether analysis of this kind constitutes the practice of
+        engineering, which would require a licence and a certificate of
+        authorisation. And where reporting what a public record contains ends
+        and appraising a property begins, which is a separate licence again.
+        Both are for the Wyoming boards, and both still have to be asked.
       </p>
       <p>
-        <b>A written scope, no charge.</b> Fixed fee, fixed deliverable, a date,
-        and the exact data request. You can take that document to somebody else
-        and get it quoted, and we would rather you did than that you felt
-        committed by a conversation.
-      </p>
-      <p>
-        <b>Non-disclosure agreement, then data.</b> Signed before the request
-        goes out, not after. For a producing asset in the United States, about
-        two thirds of what we need is public and we pull that ourselves first.
-      </p>
-      <p>
-        <b>Build, fit and reconcile.</b> We rebuild the asset from its own
-        history and fit it to outturn, rather than adjusting the model you
-        already have.
-      </p>
-      <p>
-        <b>Workshop with the people who run the asset.</b> Costs and odds on
-        every opportunity come from the crew who would execute them, not from a
-        spreadsheet assumption.
-      </p>
-      <p>
-        <b>Report, model files and handover.</b> You keep the model. Every
-        assumption is one line in a text file, so next year's change is a
-        difference rather than an excavation.
+        Publishing a price list before those come back would be advertising
+        something that might not be lawful to sell. So there is no price list.
       </p>
     </div>
   </div>
 
   <div class="block">
-    <div class="rail"><b>Data</b><span>What we ask for</span></div>
+    <div class="rail"><b>Data</b><span>Where it comes from</span></div>
     <div class="col prose">
       <p>
-        Nothing, until there is a signed scope and a non-disclosure agreement.
-        When we do ask, the request is one page: monthly volumes with producing
-        days and well count, monthly operating cost, capital authorisations and
-        actuals, realised price, and one page of lease and fiscal terms. Two
-        spreadsheet exports covers most of it.
+        Everything here is built from public filings: the Wyoming Oil and Gas
+        Conservation Commission for wells, production, surveys, completions and
+        logs, and published stratigraphic nomenclature for formation names. No
+        client has supplied data, because there are no clients.
       </p>
       <p>
-        The rest we collect ourselves from state regulators, mine safety filings,
-        technical reports on comparable projects, and published price series.
+        Records are stored as filed and every figure traces back to the load
+        that fetched it. Where the sources disagree with each other, that is
+        reported rather than resolved quietly.
       </p>
     </div>
   </div>
 """
+
 
 
 ORG_SCHEMA = """{
@@ -1061,10 +1048,9 @@ def build_pages():
         "url": "/contact/",
         "title": "Contact Gossans",
         "description": (
-            "A forty-five minute scoping call at no charge, followed by a written "
-            "fixed-fee scope. Production outlook simulation and screening from Gillette, "
-            "Wyoming. Nothing is "
-            "requested until both are agreed."
+            "Gossans is a research project built on Wyoming public records, "
+            "based in Gillette. The company is not formed and no services are "
+            "offered. Corrections to anything published here are welcome."
         ),
         "kicker": "Gillette, Wyoming",
         "priority": "0.9",
