@@ -34,20 +34,23 @@
 :root {
   color-scheme: light;
 
-  /* Vellum ground, drafting ink, red-pencil markup. */
-  --paper:      #f1f2ef;
-  --paper-2:    #e9ebe6;
-  --paper-3:    #dfe2dc;
-  --ink:        #14181a;
-  --ink-2:      #444b4d;
-  --ink-3:      #6d7573;
-  --rule:       #c7ccc5;
-  --rule-soft:  #d9ddd6;
-  --draft:      #22506b;   /* diluted drafting ink */
-  --draft-soft: #dde6ec;
-  --redline:    #a3301f;   /* the correction pencil */
-  --redline-soft: #f0dcd8;
-  --good:       #2f6b46;
+  /* Sandstone ground, charcoal, oxidised copper. Every colour here is
+     something iron or rock actually does. */
+  --paper:      #f5f2ec;
+  --paper-2:    #ece5d7;   /* sandstone, held back from the brand value */
+  --paper-3:    #e2d3b1;   /* sandstone at full strength, for insets */
+  --ink:        #1e2327;   /* charcoal */
+  --ink-2:      #474e52;
+  --ink-3:      #6c7580;   /* slate */
+  --rule:       #cdc6b6;
+  --rule-soft:  #ded7c8;
+  --draft:      #6b8a6b;   /* sage: the one non-iron colour, used sparingly */
+  --draft-soft: #dfe6dd;
+  --redline:    #b7532e;   /* oxidised copper */
+  --redline-soft: #f2e0d6;
+  --copper:     #d18a4d;   /* copper gold, the second accent */
+  --copper-soft: #f6e7d4;
+  --good:       #4a7a58;
 
   --shadow: 0 1px 0 var(--rule);
 
@@ -59,37 +62,41 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --paper:      #14181a;
-    --paper-2:    #1b2022;
-    --paper-3:    #232a2c;
-    --ink:        #e8eae5;
-    --ink-2:      #b3bab8;
-    --ink-3:      #838c8a;
-    --rule:       #2d3538;
-    --rule-soft:  #232a2c;
-    --draft:      #6ba3c6;
-    --draft-soft: #1c2c36;
-    --redline:    #dd7361;
-    --redline-soft: #33201d;
-    --good:       #6fb98a;
+    --paper:      #1a1e21;
+    --paper-2:    #232829;
+    --paper-3:    #2b3133;
+    --ink:        #ece7dd;
+    --ink-2:      #b8b6ad;
+    --ink-3:      #8b9099;
+    --rule:       #343b3d;
+    --rule-soft:  #282e30;
+    --draft:      #8aab88;
+    --draft-soft: #222b23;
+    --redline:    #d4714c;
+    --redline-soft: #33211a;
+    --copper:     #e0a06a;
+    --copper-soft: #2f2519;
+    --good:       #74b183;
     --shadow: 0 1px 0 var(--rule);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper:      #14181a;
-  --paper-2:    #1b2022;
-  --paper-3:    #232a2c;
-  --ink:        #e8eae5;
-  --ink-2:      #b3bab8;
-  --ink-3:      #838c8a;
-  --rule:       #2d3538;
-  --rule-soft:  #232a2c;
-  --draft:      #6ba3c6;
-  --draft-soft: #1c2c36;
-  --redline:    #dd7361;
-  --redline-soft: #33201d;
-  --good:       #6fb98a;
+  --paper:      #1a1e21;
+  --paper-2:    #232829;
+  --paper-3:    #2b3133;
+  --ink:        #ece7dd;
+  --ink-2:      #b8b6ad;
+  --ink-3:      #8b9099;
+  --rule:       #343b3d;
+  --rule-soft:  #282e30;
+  --draft:      #8aab88;
+  --draft-soft: #222b23;
+  --redline:    #d4714c;
+  --redline-soft: #33211a;
+  --copper:     #e0a06a;
+  --copper-soft: #2f2519;
+  --good:       #74b183;
   --shadow: 0 1px 0 var(--rule);
 }
 
@@ -180,11 +187,15 @@ header.plate { padding: 44px 0 0; }
   flex-wrap: wrap;
 }
 .wordmark .sq {
-  width: 13px;
-  height: 13px;
-  background: var(--redline);
+  width: 44px;
+  height: 27px;
+  background: none;
   align-self: center;
   flex: none;
+  background-image: url("/mark-simple.svg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 .wordmark .name {
   font-family: var(--f-display);

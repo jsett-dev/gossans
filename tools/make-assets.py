@@ -20,13 +20,22 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 # Brand tokens, matching the :root block in index.html.
-INK = (20, 24, 26)          # --ink / dark ground
-PAPER = (241, 242, 239)     # --paper
-RUST = (163, 48, 31)        # --redline, the gossan itself
-RUST_DARK = (221, 115, 97)  # --redline on a dark ground
-MUTED = (179, 186, 184)     # --ink-2 dark
-DRAFT = (107, 163, 198)     # --draft dark
-RULE = (45, 53, 56)         # --rule dark
+INK = (30, 35, 39)          # --ink, charcoal
+PAPER = (245, 242, 236)     # --paper
+RUST = (183, 83, 46)        # --redline, oxidised copper
+RUST_DARK = (212, 113, 76)  # --redline on a dark ground
+COPPER = (209, 138, 77)     # --copper, copper gold
+MUTED = (184, 182, 173)     # --ink-2 dark
+DRAFT = (138, 171, 136)     # --draft dark, sage
+RULE = (52, 59, 61)         # --rule dark
+
+# The mark's geometry lives in make-mark.py so the vector and the raster
+# cannot drift apart. Importing by path because the filename has a hyphen.
+import importlib.util as _ilu
+_spec = _ilu.spec_from_file_location(
+    "_mark", str(Path(__file__).resolve().parent / "make-mark.py"))
+_mark_mod = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_mark_mod)
 
 ROOT = Path(__file__).resolve().parent.parent / "public"
 
@@ -71,13 +80,29 @@ def tracked(draw: ImageDraw.ImageDraw, xy, text: str, font, fill,
     return x
 
 
-def make_icon(size: int, pad_ratio: float = 0.22) -> Image.Image:
-    """The mark: a rust square on ink, the same shape as favicon.svg."""
-    image = Image.new("RGBA", (size, size), INK + (255,))
+def make_icon(size: int, pad_ratio: float = 0.10) -> Image.Image:
+    """The mark on charcoal: ridge in paper, oxidised zone in copper.
+
+    Drawn from the same curves as favicon.svg, supersampled four times and
+    reduced, because Pillow will not antialias a polygon on its own and a
+    hard-edged ridge at 32 pixels looks like a mistake.
+    """
+    ss = 4
+    big = size * ss
+    image = Image.new("RGBA", (big, big), INK + (255,))
     draw = ImageDraw.Draw(image)
-    pad = round(size * pad_ratio)
-    draw.rectangle([pad, pad, size - pad - 1, size - pad - 1], fill=RUST + (255,))
-    return image
+
+    ridge, band = _mark_mod.shapes()
+    # The artwork spans x 6-194, y 17-87 in its own units.
+    art_w, art_h = 188.0, 70.0
+    inset = big * pad_ratio
+    scale = (big - inset * 2) / art_w
+    dx = inset - 6 * scale
+    dy = (big - art_h * scale) / 2 - 17 * scale
+
+    draw.polygon(_mark_mod.scaled(band, scale, dx, dy), fill=RUST + (255,))
+    draw.polygon(_mark_mod.scaled(ridge, scale, dx, dy), fill=PAPER + (255,))
+    return image.resize((size, size), Image.LANCZOS)
 
 
 def write_favicon() -> None:
