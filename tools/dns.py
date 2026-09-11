@@ -57,14 +57,38 @@ API = "https://api.cloudflare.com/client/v4"
 DMARC = "v=DMARC1; p=none; rua=mailto:hello@gossans.com; fo=1"
 
 
+def check_shape(t, source):
+    """Reject anything that is plainly not a token, and say why.
+
+    Worth the few lines: the file was once overwritten with ordinary prose,
+    and Cloudflare's answer to that was "Invalid format for Authorization
+    header", which reads like a bug in this script rather than a bad file.
+    Nothing here prints the value, only what is wrong with its shape.
+    """
+    problems = []
+    if len(t) < 20:
+        problems.append("only %d characters long" % len(t))
+    if any(c.isspace() for c in t):
+        problems.append("contains whitespace")
+    stray = sorted(set(c for c in t if not (c.isalnum() or c in "_-.")))
+    if stray:
+        problems.append("contains %s" % " ".join(repr(c) for c in stray[:6]))
+    if problems:
+        raise SystemExit(
+            "The token in %s is not a token: %s.\n"
+            "Replace it with the value Cloudflare shows once at creation."
+            % (source, ", and ".join(problems)))
+    return t
+
+
 def token():
     t = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
     if t:
-        return t, "environment"
+        return check_shape(t, "CLOUDFLARE_API_TOKEN"), "environment"
     if TOKEN_FILE.exists():
         t = TOKEN_FILE.read_text(encoding="utf-8").strip()
         if t:
-            return t, str(TOKEN_FILE)
+            return check_shape(t, str(TOKEN_FILE)), str(TOKEN_FILE)
     raise SystemExit(
         "No Cloudflare token found.\n"
         "  Either set CLOUDFLARE_API_TOKEN in your environment,\n"
@@ -138,23 +162,34 @@ def same(existing, want):
     return True
 
 
+RESOLVERS = ["https://dns.google/resolve?name=%s&type=%s",
+             "https://cloudflare-dns.com/dns-query?name=%s&type=%s"]
+
+
 def resolve(name, rtype):
-    """Ask a public resolver. Returns [] on any failure, deliberately.
+    """Ask public resolvers. Returns [] on any failure, deliberately.
 
     This answers "can the world see it yet", which is a different question
     from "is it configured", and it is much the flakier of the two: public
     resolvers cache negative answers, disagree across their own anycast fleet,
-    and rate-limit. So a miss here is reported as lag, never as a fault.
+    and rate-limit. During one run of this script Google returned a record on
+    one query and NXDOMAIN for the same name on the next, so more than one
+    resolver is asked and the first that answers wins. A miss is still
+    reported as lag, never as a fault.
     """
-    try:
-        req = urllib.request.Request(
-            "https://dns.google/resolve?name=%s&type=%s" % (name, rtype),
-            headers={"accept": "application/dns-json"})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            data = json.load(r)
-        return [a["data"].strip('"') for a in data.get("Answer", [])]
-    except Exception:
-        return []
+    for template in RESOLVERS:
+        try:
+            req = urllib.request.Request(
+                template % (name, rtype),
+                headers={"accept": "application/dns-json"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = json.load(r)
+            answers = [a["data"].strip('"') for a in data.get("Answer", [])]
+            if answers:
+                return answers
+        except Exception:
+            continue
+    return []
 
 
 def apply(args):
@@ -208,17 +243,28 @@ def verify(args):
     fault where none exists and sends you looking for it. The authoritative
     question is now answered from the zone itself, and propagation is reported
     beside it without ever failing the command.
+
+    The zone half needs a credential and the rest does not, so a missing or
+    rejected token skips that section rather than killing the command. Checking
+    is exactly when the token is most likely to be broken, and refusing to
+    report anything at that moment is the least useful thing this could do.
     """
-    tok, _ = token()
-    _, have = zone_records(tok)
+    have = None
+    try:
+        tok, _ = token()
+        _, have = zone_records(tok)
+    except SystemExit as e:
+        print("Skipping the zone check: %s\n"
+              % str(e).strip().splitlines()[0])
 
     expect = wanted(args.selector1, args.selector2)
     loose = [{"type": "TXT", "name": ZONE, "content": "v=spf1"},
              {"type": "MX", "name": ZONE, "content": "outlook.com"}]
 
-    print("In the zone:")
     bad = 0
-    for want in expect + loose:
+    if have is not None:
+        print("In the zone:")
+    for want in (expect + loose) if have is not None else []:
         got = have.get((want["type"], want["name"]), [])
         label = "@" if want["name"] == ZONE else want["name"].replace("." + ZONE, "")
         if want in loose:
@@ -252,6 +298,11 @@ def verify(args):
     if bad:
         print("%d record(s) wrong in the zone. Run without --verify to fix."
               % bad)
+    elif have is None:
+        print("Checked what is public only, since there was no usable token.")
+        print("Everything above that says seen or ok is confirmed; the zone")
+        print("itself was not read, so a record could be right in Cloudflare")
+        print("and still be caching elsewhere, or the reverse.")
     elif signing < 2:
         print("The zone is correct, but DKIM is not signing yet. Switch it on\n"
               "for %s at security.microsoft.com -> Policies & rules ->\n"
