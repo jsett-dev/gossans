@@ -1,196 +1,202 @@
 #!/usr/bin/env python3
-"""Draw the Gossans mark as vector, at three levels of detail.
+"""Draw the Gossans aperture, the master visual asset.
 
-The supplied brand sheet is a raster with a mottled mineral texture through
-the oxidised band. That is handsome at size and impossible below about sixty
-pixels, impossible in one colour, and impossible to emboss. So the geometry is
-rebuilt here from named curves: a ridge, the oxidised zone beneath it, and the
-contours below that.
+Six blades opening around a hexagonal pupil. The theme is hidden value
+becoming visible, so the geometry is parameterised on how far the aperture is
+open: `stop` runs from 0, shut, to 1, wide. That one number gives the identity
+a state rather than a picture, which is what makes it usable as a system --
+shut on the cover, open on the answer.
 
-Three versions, because one drawing cannot do every job:
+Two decisions worth stating, because they depart from the supplied artwork:
 
-    full        ridge, oxidised band, five contours. Headers, cards, print.
-    simple      ridge, band, two contours. Anything under about 48 px.
-    icon        ridge and band only, on charcoal. Favicon and app icon.
+  flat, not gradient   A gradient cannot emboss, cannot print in one ink, and
+                       shifts between reproductions. Every brand named in the
+                       brief -- BlackRock, Bloomberg, Palantir, McKinsey --
+                       uses flat colour for exactly that reason. The two-tone
+                       variant recovers the depth in a way that survives.
+
+  gaps at the corners  The blade separations sit on the hexagon's vertices
+                       rather than mid-edge, so the six straight edges stay
+                       unbroken and the silhouette still reads as a hexagon
+                       when the gaps themselves are below a pixel.
 
     python tools/make-mark.py
 
-Writes into public/. Run tools/make-assets.py afterwards to regenerate the
-raster icons and the social card from whichever mark is current.
+Writes into public/. Run tools/make-assets.py afterwards to rebuild the raster
+icons and the social card from this same geometry.
 """
 
-import io
-import re
+import math
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC = ROOT / "public"
 
-# Sampled from the brand sheet's own swatch row.
-CHARCOAL = "#1E2327"
+# Copper primary, sandstone secondary, slate accent. Charcoal is typography
+# only under the brand brief, so it does not appear in the mark at all.
 COPPER = "#B7532E"
 COPPER_GOLD = "#D18A4D"
-SANDSTONE = "#E2D3B1"
-SLATE = "#6C7580"
-PAPER = "#F1F2EF"
+SANDSTONE = "#D9C4A0"
+SLATE = "#54606B"
+PAPER = "#FBFAF7"
 
-# The ridge: asymmetric, summit left of centre, because a symmetrical peak
-# reads as a logo of a mountain and an uneven one reads as ground.
-RIDGE = (
-    "M16 57 "
-    "C37 55 50 51 63 42 "
-    "C73 34 82 20 89 17 "
-    "C96 19 104 30 114 39 "
-    "C129 50 153 57 184 57 "
-    "C162 63 121 65 91 63 "
-    "C60 61 34 61 16 57 Z"
-)
+SIDES = 6
+CX = CY = 32.0
+R = 28.0
 
-# The oxidised zone: wider than the ridge above it, tapering to points, which
-# is the whole argument. What shows at surface is the smaller part.
-BAND = (
-    "M6 66 "
-    "C40 59 71 64 101 68 "
-    "C131 72 162 70 194 62 "
-    "C167 84 131 89 99 86 "
-    "C66 83 33 76 6 66 Z"
-)
+# How far open at rest. Chosen so the pupil is legible at 16 px but the blades
+# still carry enough mass to hold colour.
+STOP = 0.68
 
-# Contours below, each shorter and fainter than the one above it.
-CONTOURS = [
-    ("M12 91 C46 85 78 93 110 95 C141 97 170 92 190 87", 1.6, 0.85),
-    ("M19 98 C50 93 80 99 110 101 C139 103 164 99 182 94", 1.4, 0.64),
-    ("M27 104 C55 100 82 105 110 107 C136 109 158 106 173 102", 1.25, 0.46),
-    ("M35 110 C60 106 84 110 109 112 C132 114 150 111 164 108", 1.1, 0.31),
-    ("M44 115 C65 112 86 115 108 117 C128 118 143 116 155 113", 1.0, 0.19),
-]
 
-HEAD = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="%s" '
+def _polar(r, deg):
+    a = math.radians(deg)
+    return (CX + r * math.cos(a), CY + r * math.sin(a))
+
+
+def _offset(p, q, d):
+    """The line p->q pushed d units to its right, as a point pair.
+
+    Right, not left, because the y axis points down in SVG and in Pillow.
+    """
+    dx, dy = q[0] - p[0], q[1] - p[1]
+    n = math.hypot(dx, dy)
+    nx, ny = -dy / n, dx / n
+    return ((p[0] + nx * d, p[1] + ny * d), (q[0] + nx * d, q[1] + ny * d))
+
+
+def _meet(a, b):
+    """Where two infinite lines cross. Both are given as point pairs."""
+    (x1, y1), (x2, y2) = a
+    (x3, y3), (x4, y4) = b
+    den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+    if abs(den) < 1e-9:
+        raise ValueError("parallel edges: check twist and stop")
+    p = x1 * y2 - y1 * x2
+    q = x3 * y4 - y3 * x4
+    return ((p * (x3 - x4) - (x1 - x2) * q) / den,
+            (p * (y3 - y4) - (y1 - y2) * q) / den)
+
+
+def blades(stop=STOP, twist=13.0, gap=2.4, r_outer=R):
+    """One polygon per blade, as plain point lists.
+
+    The blade is the quadrilateral between an outer hexagon edge and an inner
+    hexagon edge, with its two radial sides pushed inward by half the gap. Two
+    consequences are the point of doing it this way: the slits come out a
+    constant width in real units rather than a constant angle, so they do not
+    vanish as they approach the pupil; and the outer hexagon edges keep their
+    full length, so the silhouette still reads as a hexagon once the slits are
+    below a pixel.
+
+    stop    0 shut, 1 wide. Sets the pupil radius.
+    twist   degrees the inner hexagon lags the outer. This is the pinwheel.
+    gap     slit width, in the mark's own 64-unit frame.
+    """
+    r_inner = r_outer * (0.15 + 0.44 * stop)
+    step = 360.0 / SIDES
+    outer = [_polar(r_outer, -90.0 + step * k) for k in range(SIDES)]
+    inner = [_polar(r_inner, -90.0 + step * k + twist) for k in range(SIDES)]
+
+    out = []
+    for k in range(SIDES):
+        v0, v1 = outer[k], outer[(k + 1) % SIDES]
+        w0, w1 = inner[k], inner[(k + 1) % SIDES]
+        # Walking w0 -> v0 puts the blade on the left, so a positive offset
+        # eats into the blade; the far side is walked the other way round.
+        side_a = _offset(w0, v0, gap / 2.0)
+        side_b = _offset(v1, w1, gap / 2.0)
+        top = (v0, v1)
+        bottom = (w1, w0)
+        out.append([_meet(side_a, top), _meet(top, side_b),
+                    _meet(side_b, bottom), _meet(bottom, side_a)])
+    return out
+
+
+def _path(points):
+    d = "M%.2f %.2f" % points[0]
+    d += "".join("L%.2f %.2f" % p for p in points[1:])
+    return d + "Z"
+
+
+HEAD = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" '
         'role="img" aria-label="Gossans">')
 
 
-def contours(count, colour=SLATE):
-    out = []
-    for d, width, opacity in CONTOURS[:count]:
-        out.append('<path d="%s" fill="none" stroke="%s" stroke-width="%.1f" '
-                   'stroke-linecap="round" opacity="%.2f"/>'
-                   % (d, colour, width, opacity))
-    return "".join(out)
+def aperture(fill=COPPER, second=None, stop=STOP, gap=2.4,
+             background=None):
+    """The mark. `second` alternates blades, for the two-tone variant."""
+    parts = [HEAD]
+    if background:
+        parts.append('<rect width="64" height="64" fill="%s"/>' % background)
+    for k, blade in enumerate(blades(stop=stop, gap=gap)):
+        colour = second if (second is not None and k % 2) else fill
+        parts.append('<path d="%s" fill="%s"/>' % (_path(blade), colour))
+    parts.append("</svg>")
+    return "".join(parts)
 
 
-def mark(count=5, ridge=CHARCOAL, band=COPPER, contour=SLATE, height=124):
+def lockup(fill=COPPER, stop=STOP):
+    """Mark and wordmark on one line, for the header and for email.
+
+    The wordmark is set as text rather than outlines so it stays selectable
+    and stays one file; anything going to a printer should use the SVG with
+    the face embedded instead.
+    """
+    blade_paths = "".join('<path d="%s" fill="%s"/>' % (_path(b), fill)
+                          for b in blades(stop=stop))
     return (
-        (HEAD % ("0 8 200 %d" % height))
-        + '<path d="%s" fill="%s"/>' % (BAND, band)
-        + '<path d="%s" fill="%s"/>' % (RIDGE, ridge)
-        + contours(count, contour)
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64" '
+        'role="img" aria-label="Gossans">'
+        + blade_paths
+        + '<text x="80" y="43" font-family="Archivo, Helvetica, Arial, '
+          'sans-serif" font-size="34" font-weight="600" letter-spacing="-0.5" '
+          'fill="#1E2327">Gossans</text>'
         + "</svg>"
     )
 
 
-def icon(bg=CHARCOAL, ridge=PAPER, band=COPPER):
-    """Square, for a favicon. No contours: they are gone by 32 px anyway."""
-    return (
-        (HEAD % "0 0 64 64")
-        + '<rect width="64" height="64" fill="%s"/>' % bg
-        + '<g transform="translate(-2 8) scale(0.34)">'
-        + '<path d="%s" fill="%s"/>' % (BAND, band)
-        + '<path d="%s" fill="%s"/>' % (RIDGE, ridge)
-        + "</g></svg>"
-    )
-
-
-def single_colour(colour=CHARCOAL):
-    """One ink, for embossing, stamps and faxes from 1994."""
-    return (
-        (HEAD % "0 8 200 92")
-        + '<path d="%s" fill="%s" opacity="0.42"/>' % (BAND, colour)
-        + '<path d="%s" fill="%s"/>' % (RIDGE, colour)
-        + contours(3, colour)
-        + "</svg>"
-    )
+def sequence(steps=5, fill=COPPER):
+    """The mark opening. Hidden value becoming visible, said once, literally."""
+    return [aperture(fill=fill, stop=0.10 + (0.82 * i / (steps - 1)))
+            for i in range(steps)]
 
 
 # --------------------------------------------------------------------------
 # One geometry, two renderers
 # --------------------------------------------------------------------------
+# make-assets.py rasterises from these same point lists, so the PNG icons and
+# the SVG cannot drift apart.
 
-def _bezier(p0, p1, p2, p3, steps):
-    out = []
-    for i in range(1, steps + 1):
-        t = i / steps
-        u = 1 - t
-        x = (u * u * u * p0[0] + 3 * u * u * t * p1[0]
-             + 3 * u * t * t * p2[0] + t * t * t * p3[0])
-        y = (u * u * u * p0[1] + 3 * u * u * t * p1[1]
-             + 3 * u * t * t * p2[1] + t * t * t * p3[1])
-        out.append((x, y))
-    return out
-
-
-def polygon(path, steps=24):
-    """Flatten one of the M/C/Z paths above into points.
-
-    Only the subset actually used here is handled, deliberately: a general SVG
-    parser would be more code and more to get wrong, and the paths are written
-    in this file.
-    """
-    # The paths are written as "M16 57 C37 55 ...", with no space after the
-    # command letter, so splitting on whitespace is not enough.
-    tokens = re.findall(r"[A-Za-z]|-?\d+(?:\.\d+)?", path)
-    pts, cur, start, i = [], None, None, 0
-    while i < len(tokens):
-        cmd = tokens[i]
-        if cmd == "M":
-            cur = (float(tokens[i + 1]), float(tokens[i + 2]))
-            start = cur
-            pts.append(cur)
-            i += 3
-        elif cmd == "C":
-            c1 = (float(tokens[i + 1]), float(tokens[i + 2]))
-            c2 = (float(tokens[i + 3]), float(tokens[i + 4]))
-            end = (float(tokens[i + 5]), float(tokens[i + 6]))
-            pts.extend(_bezier(cur, c1, c2, end, steps))
-            cur = end
-            i += 7
-        elif cmd in ("Z", "z"):
-            if start:
-                pts.append(start)
-            i += 1
-        else:
-            raise ValueError("unsupported path command %r" % cmd)
-    return pts
+def shapes(stop=STOP, gap=2.4):
+    """Blades as flattened polygons in the 0..64 frame, for a raster renderer."""
+    return blades(stop=stop, gap=gap)
 
 
 def scaled(points, scale, dx=0.0, dy=0.0):
     return [(x * scale + dx, y * scale + dy) for x, y in points]
 
 
-RIDGE_POLY = None
-BAND_POLY = None
-
-
-def shapes():
-    """Ridge and band as flattened polygons, for a raster renderer."""
-    global RIDGE_POLY, BAND_POLY
-    if RIDGE_POLY is None:
-        RIDGE_POLY = polygon(RIDGE)
-        BAND_POLY = polygon(BAND)
-    return RIDGE_POLY, BAND_POLY
-
-
 def write(name, body):
-    path = PUBLIC / name
-    path.write_text(body, encoding="utf-8")
-    return "%-22s %5d bytes" % (name, len(body))
+    (PUBLIC / name).write_text(body, encoding="utf-8")
+    return "%-24s %5d bytes" % (name, len(body))
 
 
 if __name__ == "__main__":
     outputs = [
-        write("mark.svg", mark(5)),
-        write("mark-simple.svg", mark(2, height=100)),
-        write("mark-mono.svg", single_colour()),
-        write("favicon.svg", icon()),
+        write("mark.svg", aperture()),
+        write("mark-two-tone.svg", aperture(second=COPPER_GOLD)),
+        write("mark-mono.svg", aperture(fill="currentColor")),
+        write("mark-slate.svg", aperture(fill=SLATE)),
+        write("mark-sand.svg", aperture(fill=SANDSTONE)),
+        # Small sizes: wider gaps and a wider pupil, or both close up.
+        write("mark-simple.svg", aperture(stop=0.84, gap=3.2)),
+        # Transparent, no container: the favicon is the aperture and
+        # nothing else, so it sits on whatever the browser chrome is.
+        write("favicon.svg", aperture(stop=0.84, gap=3.2)),
+        write("mark-shut.svg", aperture(stop=0.08)),
+        write("mark-open.svg", aperture(stop=0.92)),
+        write("lockup.svg", lockup()),
     ]
     for line in outputs:
         print(line)

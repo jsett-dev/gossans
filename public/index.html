@@ -21,8 +21,8 @@
 <meta name="twitter:title" content="Gossans">
 <meta name="twitter:description" content="We simulate what your assets will produce, then screen every option against that outlook.">
 
-<meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#1a1e21" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f4ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1f23" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon.ico" sizes="32x32">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -37,21 +37,23 @@
 
   /* Warm white ground, charcoal for type rather than for mass, oxidised
      copper as the only pigment that ever raises its voice. */
-  --paper:      #fbfaf7;
-  --paper-2:    #f4f1ea;   /* barely a surface: a shade, not a panel */
-  --paper-3:    #ece7db;   /* sandstone, reserved for one inset per page */
-  --ink:        #1e2327;   /* charcoal, for type */
-  --ink-2:      #52585c;
-  --ink-3:      #8a9098;   /* slate, lightened: labels should recede */
-  --rule:       #e3ded2;   /* hairlines, not borders */
-  --rule-soft:  #efebe1;
-  --draft:      #6b8a6b;   /* sage: the one non-iron colour, used sparingly */
-  --draft-soft: #dfe6dd;
-  --redline:    #b7532e;   /* oxidised copper */
-  --redline-soft: #f2e0d6;
-  --copper:     #d18a4d;   /* copper gold, the second accent */
-  --copper-soft: #f6e7d4;
-  --good:       #4a7a58;
+  --paper:      #f7f4ef;   /* the ground. Warm white, never dark */
+  --paper-2:    #f1ebe1;   /* barely a surface: a shade, not a panel */
+  --paper-3:    #e8dcc6;   /* sandstone as a tint, for inset surfaces */
+  --sand:       #d9c4a0;   /* sandstone at full strength: supporting */
+  --ink:        #23292f;   /* charcoal. Typography only, never a fill */
+  --ink-2:      #4e565e;
+  --ink-3:      #7d8892;   /* light slate: labels should recede */
+  --slate:      #54606b;   /* slate, the accent value */
+  --rule:       #e2dacb;   /* hairlines, not borders */
+  --rule-soft:  #eee8dc;
+  --draft:      #b7532e;   /* was sage. Copper is the primary, used heavily */
+  --draft-soft: #f4e2d7;
+  --redline:    #b7532e;   /* copper */
+  --redline-soft: #f4e2d7;
+  --copper:     #d18a4d;   /* copper gold, the secondary */
+  --copper-soft: #f7e9d6;
+  --good:       #4a7a58;   /* semantic, not brand */
 
   --shadow: 0 1px 0 var(--rule);
 
@@ -63,16 +65,18 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --paper:      #1a1e21;
-    --paper-2:    #232829;
-    --paper-3:    #2b3133;
+    --paper:      #1b1f23;
+    --paper-2:    #242a2e;
+    --paper-3:    #2d3238;
+    --sand:       #8f7f66;
     --ink:        #ece7dd;
-    --ink-2:      #b8b6ad;
-    --ink-3:      #8b9099;
-    --rule:       #343b3d;
-    --rule-soft:  #282e30;
-    --draft:      #8aab88;
-    --draft-soft: #222b23;
+    --ink-2:      #b4b2aa;
+    --ink-3:      #8a939c;
+    --slate:      #97a2ad;
+    --rule:       #343b41;
+    --rule-soft:  #282e33;
+    --draft:      #d4714c;
+    --draft-soft: #33211a;
     --redline:    #d4714c;
     --redline-soft: #33211a;
     --copper:     #e0a06a;
@@ -83,16 +87,18 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper:      #1a1e21;
-  --paper-2:    #232829;
-  --paper-3:    #2b3133;
+  --paper:      #1b1f23;
+  --paper-2:    #242a2e;
+  --paper-3:    #2d3238;
+  --sand:       #8f7f66;
   --ink:        #ece7dd;
-  --ink-2:      #b8b6ad;
-  --ink-3:      #8b9099;
-  --rule:       #343b3d;
-  --rule-soft:  #282e30;
-  --draft:      #8aab88;
-  --draft-soft: #222b23;
+  --ink-2:      #b4b2aa;
+  --ink-3:      #8a939c;
+  --slate:      #97a2ad;
+  --rule:       #343b41;
+  --rule-soft:  #282e33;
+  --draft:      #d4714c;
+  --draft-soft: #33211a;
   --redline:    #d4714c;
   --redline-soft: #33211a;
   --copper:     #e0a06a;
@@ -188,8 +194,8 @@ header.plate { padding: 72px 0 0; }
   flex-wrap: wrap;
 }
 .wordmark .sq {
-  width: 44px;
-  height: 27px;
+  width: 34px;
+  height: 34px;
   background: none;
   align-self: center;
   flex: none;
@@ -200,17 +206,21 @@ header.plate { padding: 72px 0 0; }
 }
 .wordmark .name {
   font-family: var(--f-display);
-  font-weight: 800;
-  font-size: clamp(30px, 4vw, 42px);
-  letter-spacing: -.035em;
+  font-weight: 600;
+  font-size: clamp(21px, 2.5vw, 27px);
+  letter-spacing: .22em;
+  text-transform: uppercase;
   line-height: 1;
+  /* Tracking adds space after the last letter too, which throws the gap to
+     whatever follows out by a fifth of an em. */
+  margin-right: -.22em;
 }
 .wordmark .kicker {
   font-family: var(--f-data);
   font-size: 11px;
-  letter-spacing: .18em;
+  letter-spacing: .2em;
   text-transform: uppercase;
-  color: var(--draft);
+  color: var(--copper);
 }
 
 .titleblock {
@@ -259,6 +269,39 @@ header.plate { padding: 72px 0 0; }
   z-index: 0;
 }
 .thesis > *:not(.field) { position: relative; z-index: 1; }
+
+/* The signature graphic is data, so it gets a caption like any other figure.
+   Sitting it against the lede rather than under the graphic keeps it out of
+   the headline's way. */
+.fieldnote {
+  margin-top: 22px;
+  padding-left: 15px;
+  border-left: 2px solid var(--sand);
+  max-width: 54ch;
+  font-family: var(--f-data);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--ink-3);
+}
+.fieldnote b { color: var(--ink-2); font-weight: 500; }
+
+/* The mark, once, very large and very quiet, behind the closing statement.
+   Copper at this size stops supporting the page and starts competing. */
+.cta { position: relative; }
+.cta .iris {
+  position: absolute;
+  top: 50%;
+  right: -12px;
+  width: 260px;
+  height: 260px;
+  transform: translateY(-50%);
+  background: url("/mark-sand.svg") center / contain no-repeat;
+  opacity: .5;
+  pointer-events: none;
+  z-index: 0;
+}
+.cta > * { position: relative; z-index: 1; }
+@media (max-width: 900px) { .cta .iris { display: none; } }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .thesis .field { opacity: .42; }
 }
@@ -549,14 +592,14 @@ header.plate { padding: 72px 0 0; }
   text-transform: uppercase;
   text-decoration: none;
   color: var(--paper);
-  background: var(--ink);
+  background: var(--redline);
   padding: 15px 26px;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--redline);
   white-space: nowrap;
   display: inline-block;
   transition: background .12s ease, color .12s ease;
 }
-.cta a.btn:hover { background: var(--draft); border-color: var(--draft); color: #fff; }
+.cta a.btn:hover { background: var(--slate); border-color: var(--slate); color: #fff; }
 
 a { color: var(--draft); text-underline-offset: 2px; }
 a:focus-visible, .btn:focus-visible, button:focus-visible {
@@ -649,10 +692,10 @@ img, svg, video { max-width: 100%; height: auto; }
   padding: 4px 0;
   border-bottom: 1px solid transparent;
 }
-.topnav a:hover { color: var(--ink); border-bottom-color: var(--rust); }
+.topnav a:hover { color: var(--ink); border-bottom-color: var(--redline); }
 .rl h3 a { color: inherit; text-decoration: none; }
-.rl h3 a:hover { color: var(--rust); }
-.rl h3 a::after { content: " \2192"; color: var(--rust); opacity: .55; }
+.rl h3 a:hover { color: var(--redline); }
+.rl h3 a::after { content: " \2192"; color: var(--redline); opacity: .55; }
 @media (max-width: 700px) { .topnav { gap: 14px; font-size: 10px; } }
 </style>
 </head>
@@ -664,7 +707,7 @@ img, svg, video { max-width: 100%; height: auto; }
       <div class="wordmark">
         <span class="sq" aria-hidden="true"></span>
         <span class="name">Gossans</span>
-        <span class="kicker">Production outlook simulation &amp; opportunity screening</span>
+        <span class="kicker">Earth intelligence</span>
       </div>
       <nav class="topnav">
         <a href="/fit/">Fit a well</a>
@@ -692,6 +735,14 @@ img, svg, video { max-width: 100%; height: auto; }
       every commodity you hold, then screen every option against that outlook
       and rank them with a price and a probability on every line. Not a
       dashboard. A decision.
+    </p>
+
+    <p class="fieldnote">
+      The lines behind this statement are not decoration. They are
+      <b>378 producing wells</b> from the Powder River Basin study, oil rate
+      against months on production, drawn straight from the state's public
+      records. The copper line is the median of all of them. Everything the
+      models here are fitted to is already on the page.
     </p>
 
     <div class="proof">
@@ -1235,6 +1286,7 @@ convert tail to gas lift      cost <b>$2.4M</b>   risked <b>&minus;$2.4M</b>   w
     <div class="rail"><b>Next</b><span>Start here</span></div>
     <div class="col">
       <div class="cta">
+        <div class="iris" aria-hidden="true"></div>
         <div>
           <h2>Send us one asset and two spreadsheets.</h2>
           <p>

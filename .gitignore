@@ -23,3 +23,7 @@ __pycache__/
 # The generated data files under public/data are deployed content, not build
 # scratch. The site is served from git, so they have to be committed. Rebuild
 # them with scripts/export_geology.py in the gossans-data repository.
+
+# tools/make-assets.py writes this so the blade gaps can be checked at every
+# size that ships. It is a proof sheet, not an asset the site serves.
+mark-proof.png
