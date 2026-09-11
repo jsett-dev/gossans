@@ -116,28 +116,11 @@ BODY = r"""
   </div>
 
 <style>
-.ctl { display:flex; flex-wrap:wrap; gap:10px 26px; margin-bottom:18px; }
-.ctlgrp { display:flex; flex-wrap:wrap; gap:6px; }
-.ctlgrp button { font-family:var(--f-data); font-size:11px; letter-spacing:.1em;
-  text-transform:uppercase; padding:6px 11px; background:transparent;
-  border:1px solid var(--rule); color:var(--ink-2); cursor:pointer; }
-.ctlgrp button:hover { border-color:var(--rust); color:var(--ink); }
-.ctlgrp button[aria-pressed="true"] { background:var(--rust); border-color:var(--rust);
-  color:#fff; }
 .leafwrap { height:520px; border:1px solid var(--rule); background:var(--paper-2); }
 .leafwrap .leaflet-container { background:var(--paper-2); font-family:var(--f-data); }
 .leafwrap .leaflet-popup-content { font-family:var(--f-data); font-size:12px;
   line-height:1.7; }
 .leafwrap .leaflet-control-attribution { font-size:9px; }
-.mapwrap { overflow-x:auto; border:1px solid var(--rule); background:var(--paper-2); }
-.mapwrap svg { display:block; width:100%; min-width:620px; height:auto; }
-.legend { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px;
-  margin:12px 0 0; font-family:var(--f-data); font-size:11px; color:var(--ink-2); }
-.legend .sw { display:inline-block; width:22px; height:11px; margin-right:6px;
-  vertical-align:-1px; border:1px solid var(--rule); }
-.detail { margin-top:16px; padding:14px 16px; border-left:2px solid var(--rust);
-  font-family:var(--f-data); font-size:13px; line-height:1.75; color:var(--ink-2); }
-.detail b { color:var(--ink); }
 .cell { cursor:pointer; }
 .cell:hover { stroke:var(--rust); stroke-width:2; }
 ul.unknown { list-style:none; padding:0; margin:18px 0 0; }

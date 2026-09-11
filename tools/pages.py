@@ -989,7 +989,18 @@ def build_pages():
     total = len(FINDINGS)
     pages = []
 
+    import fitter_page
     import model_page
+
+    pages.append({
+        "url": "/fit/",
+        "title": "%s | Gossans" % fitter_page.TITLE,
+        "description": fitter_page.DESCRIPTION,
+        "kicker": "Runs in your browser",
+        "priority": "1.0",
+        "body": fitter_page.BODY,
+        "head_extra": fitter_page.HEAD_EXTRA,
+    })
 
     pages.append({
         "url": "/basin-model/",

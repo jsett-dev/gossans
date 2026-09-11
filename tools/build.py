@@ -89,6 +89,7 @@ HEAD = """<!doctype html>
         <span class="kicker">{kicker}</span>
       </div>
       <nav class="topnav">
+        <a href="/fit/">Fit a well</a>
         <a href="/basin-model/">Model</a>
         <a href="/powder-river-basin/">Study</a>
         <a href="/findings/">Findings</a>
@@ -134,6 +135,11 @@ FOOT = """
 # because that is what borrow_from_home() lifts.
 EXTRA_CSS = """
 <style>
+/* The home page defines --redline and --rule. These pages were written against
+   --rust and --rule-2, which do not exist, so every accent border silently
+   fell back to nothing. Aliasing here fixes all of them at once, and using
+   var() rather than a literal means they follow the dark theme too. */
+:root { --rust: var(--redline); --rule-2: var(--rule); }
 .crumb { font-family:var(--f-data); font-size:11px; letter-spacing:.14em;
          text-transform:uppercase; color:var(--ink-3); margin-bottom:16px; }
 .crumb a { color:var(--ink-3); }
@@ -161,6 +167,26 @@ EXTRA_CSS = """
 .pager a:hover { color:var(--rust); }
 .pager .dir { display:block; color:var(--ink-3); letter-spacing:.12em;
               text-transform:uppercase; font-size:10px; margin-bottom:4px; }
+/* Shared controls: button groups, scrollable figures, legends, callouts.
+   These live here rather than on one page because more than one page needs
+   them, and a second copy is a second thing to forget to change. */
+.ctl { display:flex; flex-wrap:wrap; gap:10px 26px; margin-bottom:18px; }
+.ctlgrp { display:flex; flex-wrap:wrap; gap:6px; }
+.ctlgrp button { font-family:var(--f-data); font-size:11px; letter-spacing:.1em;
+  text-transform:uppercase; padding:7px 13px; background:transparent;
+  border:1px solid var(--rule); color:var(--ink-2); cursor:pointer; }
+.ctlgrp button:hover { border-color:var(--rust); color:var(--ink); }
+.ctlgrp button[aria-pressed="true"] { background:var(--rust);
+  border-color:var(--rust); color:#fff; }
+.mapwrap { overflow-x:auto; border:1px solid var(--rule); background:var(--paper-2); }
+.mapwrap svg { display:block; width:100%; min-width:620px; height:auto; }
+.legend { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px;
+  margin:12px 0 0; font-family:var(--f-data); font-size:11px; color:var(--ink-2); }
+.legend .sw { display:inline-block; width:22px; height:11px; margin-right:6px;
+  vertical-align:-1px; border:1px solid var(--rule); }
+.detail { margin-top:16px; padding:14px 16px; border-left:2px solid var(--rust);
+  font-family:var(--f-data); font-size:13px; line-height:1.75; color:var(--ink-2); }
+.detail b { color:var(--ink); }
 .tbl { overflow-x:auto; margin:4px 0 8px; }
 .tbl table { border-collapse:collapse; width:100%; min-width:520px;
              font-family:var(--f-data); font-size:13px; }
