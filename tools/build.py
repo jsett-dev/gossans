@@ -140,18 +140,18 @@ EXTRA_CSS = """
    fell back to nothing. Aliasing here fixes all of them at once, and using
    var() rather than a literal means they follow the dark theme too. */
 :root { --rust: var(--redline); --rule-2: var(--rule); }
-.crumb { font-family:var(--f-data); font-size:11px; letter-spacing:.14em;
-         text-transform:uppercase; color:var(--ink-3); margin-bottom:16px; }
+.crumb { font-family:var(--f-data); font-size:10.5px; letter-spacing:.16em;
+         text-transform:uppercase; color:var(--ink-3); margin-bottom:26px; }
 .crumb a { color:var(--ink-3); }
 .crumb a:hover { color:var(--rust); }
 .article h1 { max-width:24ch; }
-.standfirst { font-size:19px; line-height:1.55; color:var(--ink-2);
-              max-width:60ch; margin:0 0 4px; }
-.costline { font-family:var(--f-data); font-size:13px; line-height:1.75;
-            color:var(--rust); border-left:2px solid var(--rust);
-            padding:12px 0 12px 18px; margin:28px 0; }
-.indexlist a.row { display:grid; grid-template-columns:3rem 1fr auto; gap:18px;
-                   align-items:baseline; padding:22px 0;
+.standfirst { font-size:21px; line-height:1.62; color:var(--ink-2);
+              max-width:56ch; margin:0 0 8px; }
+.costline { font-family:var(--f-data); font-size:13px; line-height:1.85;
+            color:var(--rust); border-left:1px solid var(--rust);
+            padding:6px 0 6px 22px; margin:44px 0; }
+.indexlist a.row { display:grid; grid-template-columns:3.5rem 1fr auto; gap:24px;
+                   align-items:baseline; padding:34px 0;
                    border-top:1px solid var(--rule-2); text-decoration:none;
                    color:inherit; }
 .indexlist a.row:hover h3 { color:var(--rust); }
