@@ -979,6 +979,8 @@ def build_pages():
     import fitter_page
     import model_page
     import strata_page
+    import data_page
+    import studies_page
 
     pages.append({
         "url": "/fit/",
@@ -1018,6 +1020,24 @@ def build_pages():
     </p>
   </section>
 """,
+    })
+
+    pages.append({
+        "url": "/data/",
+        "title": "%s | Gossans" % data_page.TITLE,
+        "description": data_page.DESCRIPTION,
+        "kicker": "Data",
+        "priority": "0.9",
+        "body": data_page.BODY,
+    })
+
+    pages.append({
+        "url": "/studies/",
+        "title": "%s | Gossans" % studies_page.TITLE,
+        "description": studies_page.DESCRIPTION,
+        "kicker": "Studies",
+        "priority": "0.9",
+        "body": studies_page.BODY,
     })
 
     pages.append({

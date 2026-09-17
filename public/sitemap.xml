@@ -21,6 +21,16 @@
     <priority>0.3</priority>
   </url>
   <url>
+    <loc>https://www.gossans.com/data/</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.gossans.com/studies/</loc>
+    <changefreq>yearly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>https://www.gossans.com/powder-river-basin/</loc>
     <changefreq>yearly</changefreq>
     <priority>1.0</priority>

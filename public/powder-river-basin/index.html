@@ -695,6 +695,49 @@ img, svg, video { max-width: 100%; height: auto; }
 .rl h3 a { color: inherit; text-decoration: none; }
 .rl h3 a:hover { color: var(--redline); }
 .rl h3 a::after { content: " \2192"; color: var(--redline); opacity: .55; }
+
+/* The navigation follows you down the page. It sits outside the header
+   because sticky only holds while its own container is in view, and the
+   header leaves the screen almost immediately. */
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+.navbar .inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 9px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px 28px;
+  flex-wrap: wrap;
+}
+.navbar .mini {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--ink);
+  font-family: var(--f-display);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+}
+.navbar .mini .sq {
+  width: 20px;
+  height: 20px;
+  background: url("/mark-simple.svg") center / contain no-repeat;
+}
+header.plate { padding: 40px 0 0; }
+@media (max-width: 700px) {
+  .navbar .inner { padding: 8px 20px; }
+  .navbar .mini span:last-child { display: none; }
+}
 @media (max-width: 700px) { .topnav { gap: 14px; font-size: 10px; } }
 </style>
 <style>
@@ -769,6 +812,23 @@ img, svg, video { max-width: 100%; height: auto; }
 </style>
 </head>
 <body>
+<div class="navbar">
+  <div class="inner">
+    <a class="mini" href="/">
+      <span class="sq" aria-hidden="true"></span>
+      <span>Gossans</span>
+    </a>
+    <nav class="topnav">
+        <a href="/basin-model/">Model</a>
+        <a href="/fit/">Fit a well</a>
+        <a href="/data/">Data</a>
+        <a href="/studies/">Studies</a>
+        <a href="/findings/">Findings</a>
+        <a href="/about/">About</a>
+        <a href="/contact/">Contact</a>
+    </nav>
+  </div>
+</div>
 <div class="sheet">
 
   <header class="plate">
@@ -780,15 +840,6 @@ img, svg, video { max-width: 100%; height: auto; }
         </a>
         <span class="kicker">Study &middot; Converse County, Wyoming</span>
       </div>
-      <nav class="topnav">
-        <a href="/fit/">Fit a well</a>
-        <a href="/basin-model/">Model</a>
-        <a href="/strata/">Strata 3D</a>
-        <a href="/powder-river-basin/">Study</a>
-        <a href="/findings/">Findings</a>
-        <a href="/about/">About</a>
-        <a href="/contact/">Contact</a>
-      </nav>
     </div>
   </header>
 

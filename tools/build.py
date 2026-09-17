@@ -77,6 +77,23 @@ HEAD = """<!doctype html>
 {style}{schema}{head_extra}
 </head>
 <body>
+<div class="navbar">
+  <div class="inner">
+    <a class="mini" href="/">
+      <span class="sq" aria-hidden="true"></span>
+      <span>Gossans</span>
+    </a>
+    <nav class="topnav">
+        <a href="/basin-model/">Model</a>
+        <a href="/fit/">Fit a well</a>
+        <a href="/data/">Data</a>
+        <a href="/studies/">Studies</a>
+        <a href="/findings/">Findings</a>
+        <a href="/about/">About</a>
+        <a href="/contact/">Contact</a>
+    </nav>
+  </div>
+</div>
 <div class="sheet">
 
   <header class="plate">
@@ -88,15 +105,6 @@ HEAD = """<!doctype html>
         </a>
         <span class="kicker">{kicker}</span>
       </div>
-      <nav class="topnav">
-        <a href="/fit/">Fit a well</a>
-        <a href="/basin-model/">Model</a>
-        <a href="/strata/">Strata 3D</a>
-        <a href="/powder-river-basin/">Study</a>
-        <a href="/findings/">Findings</a>
-        <a href="/about/">About</a>
-        <a href="/contact/">Contact</a>
-      </nav>
     </div>
   </header>
 """
