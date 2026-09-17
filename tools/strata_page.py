@@ -42,27 +42,30 @@ HERO = r"""
 
 """
 
-SECTIONS = r"""
-  <div class="block" id="strata">
-    <div class="rail"><b>View</b><span>Measured tops</span><span>and wellbores</span></div>
-    <div class="col">
-      <h2>The same wells in three dimensions.</h2>
-      <p class="prose" style="color:var(--ink-2); margin-bottom:18px;">
-        Drag to rotate, scroll to zoom, hold shift to pan. Each mark is a
-        formation top at the depth an operator filed for it; each line is a
-        wellbore, following its filed survey where one exists and vertical
-        where none does.
-      </p>
-      <div class="ctlgrp" id="ctl"></div>
+PANE = r"""
+  <div id="strata" class="pane">
+    <div class="maprow">
       <div class="scenewrap">
         <canvas id="scene"></canvas>
         <div id="hud" class="hud">loading&hellip;</div>
         <div id="legend" class="legend3d"></div>
       </div>
-      <p class="detail" id="note"></p>
+      <div class="panel">
+        <h3>Display</h3>
+        <div class="ctlgrp" id="ctl"></div>
+        <p class="zoomhint">
+          Drag to rotate, scroll to zoom, hold shift to pan. Each mark is a
+          formation top at the depth an operator filed for it; each line is a
+          wellbore, following its filed survey where one exists and vertical
+          where none does.
+        </p>
+      </div>
     </div>
+    <p class="detail" id="note"></p>
   </div>
+"""
 
+NOTES = r"""
   <div class="block">
     <div class="rail"><b>Honesty</b><span>What is not here</span></div>
     <div class="col prose">
@@ -100,7 +103,24 @@ SECTIONS = r"""
   </div>
 """
 
+# Standalone form, for any page that shows the scene on its own rather than
+# paired with the map, where the pane needs its own block and heading.
+_OPEN = r"""
+  <div class="block">
+    <div class="rail"><b>View</b><span>Measured tops</span><span>and wellbores</span></div>
+    <div class="col">
+      <h2>The same wells in three dimensions.</h2>
+"""
+
+_CLOSE = r"""
+    </div>
+  </div>
+"""
+
+SECTIONS = _OPEN + PANE + _CLOSE + NOTES
+
 STYLE = r"""
+.maprow .scenewrap { height: 560px; }
 .scenewrap { position: relative; border: 1px solid var(--rule); background: var(--paper-2);
   height: min(70vh, 620px); overflow: hidden; }
 .scenewrap canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
@@ -197,6 +217,10 @@ function gossansStrata() {
     home();
     resize();
     addEventListener("resize", resize);
+    // The pane may be hidden when this runs, in which case the canvas has no
+    // size until the switcher shows it and calls this back.
+    window.gossansViews = window.gossansViews || {};
+    window.gossansViews.resize3d = function(){ resize(); home(); };
     bindCamera();
     renderer.setAnimationLoop(function () { renderer.render(scene, camera); });
 
@@ -433,6 +457,7 @@ if (document.readyState === "loading") {
 """
 
 
-EMBED = "".join([SECTIONS, "<style>", STYLE, "</style>",
-                 "<script>", SCRIPT, "</script>"])
+ASSETS = "".join(["<style>", STYLE, "</style>",
+                  "<script>", SCRIPT, "</script>"])
+EMBED = SECTIONS + ASSETS
 BODY = HERO + EMBED

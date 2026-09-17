@@ -998,7 +998,8 @@ def build_pages():
         "description": model_page.DESCRIPTION,
         "kicker": "Interactive model",
         "priority": "1.0",
-        "body": model_page.BODY + strata_page.EMBED,
+        "body": (model_page.BODY.replace("<!--PANE3D-->", strata_page.PANE)
+                 + strata_page.NOTES + strata_page.ASSETS),
         "head_extra": model_page.HEAD_EXTRA + strata_page.HEAD_EXTRA,
     })
 

@@ -38,11 +38,12 @@ BODY = r"""
     <div class="rail"><b>Views</b><span>Map and 3D</span></div>
     <div class="col">
       <div class="viewswitch">
-        <a class="vs on" href="#mapview">Map</a>
-        <a class="vs" href="#strata">Three dimensions</a>
+        <a class="vs on" data-view="map" href="#mapview">Map</a>
+        <a class="vs" data-view="strata" href="#strata">Three dimensions</a>
       </div>
+      <div id="mapview" class="pane">
       <div class="ctl"><div class="ctlgrp" id="mapviews"></div></div>
-      <div id="mapview" class="maprow">
+      <div class="maprow">
         <div id="leaflet" class="leafwrap"></div>
         <div class="panel" id="layers">
           <h3>Layers</h3>
@@ -76,6 +77,8 @@ BODY = r"""
         a map showing only the wells that behaved is a map that has quietly
         chosen its own evidence.
       </p>
+      </div>
+<!--PANE3D-->
     </div>
   </div>
 
@@ -163,6 +166,8 @@ BODY = r"""
 .viewswitch .vs + .vs { border-left:0; }
 .viewswitch .vs:hover { color:var(--ink); }
 .viewswitch .vs.on { background:var(--paper-3); color:var(--ink); }
+.viewswitch .vs { cursor:pointer; }
+.paneoff { display:none !important; }
 /* Grid labels: drawn always, revealed by zoom. Hiding them with CSS avoids
    rebinding thousands of tooltips every time the map moves. */
 .plsslab { background:none; border:0; box-shadow:none; color:var(--ink-3);
@@ -318,6 +323,38 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       s.push("Tops: "+bits.join(" &middot; "));
     } else s.push("No formation tops with enough picks in this township.");
     d.innerHTML=s.join("<br>");
+  }
+
+  // ------------------------------------------------------------------ views
+  // Map and 3D occupy the same place on the page and swap, rather than the
+  // button scrolling to a second view further down. Both libraries size
+  // themselves from a visible container, so each is told to re-measure the
+  // moment its pane is shown.
+  function viewswitch(){
+    var tabs = document.querySelectorAll(".viewswitch .vs");
+    if (!tabs.length) return;
+    var mapPane = document.getElementById("mapview");
+    var strataPane = document.getElementById("strata");
+    if (!mapPane || !strataPane) return;
+
+    function show(which){
+      var wantMap = which === "map";
+      mapPane.classList.toggle("paneoff", !wantMap);
+      strataPane.classList.toggle("paneoff", wantMap);
+      tabs.forEach(function(t){
+        t.classList.toggle("on", (t.dataset.view === which));
+      });
+      var v = window.gossansViews || {};
+      if (wantMap && v.map) { v.map.invalidateSize(); }
+      if (!wantMap && v.resize3d) { v.resize3d(); }
+    }
+    tabs.forEach(function(t){
+      t.addEventListener("click", function(e){
+        e.preventDefault();
+        show(t.dataset.view);
+      });
+    });
+    show("map");
   }
 
   // ---------------------------------------------------------------- cadastral
@@ -486,7 +523,10 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     // Wheel zoom on, to match the 3D view on the same page. Leaflet
     // already pans by dragging.
     lmap = L.map("leaflet", {scrollWheelZoom:true});
+    window.gossansViews = window.gossansViews || {};
+    window.gossansViews.map = lmap;
     cadastral(lmap);
+    viewswitch();
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 15, minZoom: 6,
       attribution: 'Basemap &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. ' +

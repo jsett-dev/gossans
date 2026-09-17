@@ -865,11 +865,12 @@ header.plate { padding: 40px 0 0; }
     <div class="rail"><b>Views</b><span>Map and 3D</span></div>
     <div class="col">
       <div class="viewswitch">
-        <a class="vs on" href="#mapview">Map</a>
-        <a class="vs" href="#strata">Three dimensions</a>
+        <a class="vs on" data-view="map" href="#mapview">Map</a>
+        <a class="vs" data-view="strata" href="#strata">Three dimensions</a>
       </div>
+      <div id="mapview" class="pane">
       <div class="ctl"><div class="ctlgrp" id="mapviews"></div></div>
-      <div id="mapview" class="maprow">
+      <div class="maprow">
         <div id="leaflet" class="leafwrap"></div>
         <div class="panel" id="layers">
           <h3>Layers</h3>
@@ -903,6 +904,29 @@ header.plate { padding: 40px 0 0; }
         a map showing only the wells that behaved is a map that has quietly
         chosen its own evidence.
       </p>
+      </div>
+
+  <div id="strata" class="pane">
+    <div class="maprow">
+      <div class="scenewrap">
+        <canvas id="scene"></canvas>
+        <div id="hud" class="hud">loading&hellip;</div>
+        <div id="legend" class="legend3d"></div>
+      </div>
+      <div class="panel">
+        <h3>Display</h3>
+        <div class="ctlgrp" id="ctl"></div>
+        <p class="zoomhint">
+          Drag to rotate, scroll to zoom, hold shift to pan. Each mark is a
+          formation top at the depth an operator filed for it; each line is a
+          wellbore, following its filed survey where one exists and vertical
+          where none does.
+        </p>
+      </div>
+    </div>
+    <p class="detail" id="note"></p>
+  </div>
+
     </div>
   </div>
 
@@ -990,6 +1014,8 @@ header.plate { padding: 40px 0 0; }
 .viewswitch .vs + .vs { border-left:0; }
 .viewswitch .vs:hover { color:var(--ink); }
 .viewswitch .vs.on { background:var(--paper-3); color:var(--ink); }
+.viewswitch .vs { cursor:pointer; }
+.paneoff { display:none !important; }
 /* Grid labels: drawn always, revealed by zoom. Hiding them with CSS avoids
    rebinding thousands of tooltips every time the map moves. */
 .plsslab { background:none; border:0; box-shadow:none; color:var(--ink-3);
@@ -1145,6 +1171,38 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       s.push("Tops: "+bits.join(" &middot; "));
     } else s.push("No formation tops with enough picks in this township.");
     d.innerHTML=s.join("<br>");
+  }
+
+  // ------------------------------------------------------------------ views
+  // Map and 3D occupy the same place on the page and swap, rather than the
+  // button scrolling to a second view further down. Both libraries size
+  // themselves from a visible container, so each is told to re-measure the
+  // moment its pane is shown.
+  function viewswitch(){
+    var tabs = document.querySelectorAll(".viewswitch .vs");
+    if (!tabs.length) return;
+    var mapPane = document.getElementById("mapview");
+    var strataPane = document.getElementById("strata");
+    if (!mapPane || !strataPane) return;
+
+    function show(which){
+      var wantMap = which === "map";
+      mapPane.classList.toggle("paneoff", !wantMap);
+      strataPane.classList.toggle("paneoff", wantMap);
+      tabs.forEach(function(t){
+        t.classList.toggle("on", (t.dataset.view === which));
+      });
+      var v = window.gossansViews || {};
+      if (wantMap && v.map) { v.map.invalidateSize(); }
+      if (!wantMap && v.resize3d) { v.resize3d(); }
+    }
+    tabs.forEach(function(t){
+      t.addEventListener("click", function(e){
+        e.preventDefault();
+        show(t.dataset.view);
+      });
+    });
+    show("map");
   }
 
   // ---------------------------------------------------------------- cadastral
@@ -1313,7 +1371,10 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     // Wheel zoom on, to match the 3D view on the same page. Leaflet
     // already pans by dragging.
     lmap = L.map("leaflet", {scrollWheelZoom:true});
+    window.gossansViews = window.gossansViews || {};
+    window.gossansViews.map = lmap;
     cadastral(lmap);
+    viewswitch();
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 15, minZoom: 6,
       attribution: 'Basemap &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. ' +
@@ -1439,26 +1500,6 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
 })();
 </script>
 
-  <div class="block" id="strata">
-    <div class="rail"><b>View</b><span>Measured tops</span><span>and wellbores</span></div>
-    <div class="col">
-      <h2>The same wells in three dimensions.</h2>
-      <p class="prose" style="color:var(--ink-2); margin-bottom:18px;">
-        Drag to rotate, scroll to zoom, hold shift to pan. Each mark is a
-        formation top at the depth an operator filed for it; each line is a
-        wellbore, following its filed survey where one exists and vertical
-        where none does.
-      </p>
-      <div class="ctlgrp" id="ctl"></div>
-      <div class="scenewrap">
-        <canvas id="scene"></canvas>
-        <div id="hud" class="hud">loading&hellip;</div>
-        <div id="legend" class="legend3d"></div>
-      </div>
-      <p class="detail" id="note"></p>
-    </div>
-  </div>
-
   <div class="block">
     <div class="rail"><b>Honesty</b><span>What is not here</span></div>
     <div class="col prose">
@@ -1495,6 +1536,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     </div>
   </div>
 <style>
+.maprow .scenewrap { height: 560px; }
 .scenewrap { position: relative; border: 1px solid var(--rule); background: var(--paper-2);
   height: min(70vh, 620px); overflow: hidden; }
 .scenewrap canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
@@ -1589,6 +1631,10 @@ function gossansStrata() {
     home();
     resize();
     addEventListener("resize", resize);
+    // The pane may be hidden when this runs, in which case the canvas has no
+    // size until the switcher shows it and calls this back.
+    window.gossansViews = window.gossansViews || {};
+    window.gossansViews.resize3d = function(){ resize(); home(); };
     bindCamera();
     renderer.setAnimationLoop(function () { renderer.render(scene, camera); });
 
