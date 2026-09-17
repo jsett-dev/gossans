@@ -118,10 +118,27 @@ NOTES = r"""
         means the ground, not the trees or the buildings on it, and anything
         needing the real resolution should go to
         <a href="https://www.usgs.gov/3d-elevation-program">3DEP</a> rather
-        than to this page. Compared against the elevations operators filed
-        with their own formation tops, on 400 wells, the filed figure sits a
-        median 14&nbsp;m above this grid, which is about what a kelly bushing
-        height plus a 400&nbsp;m average of the ground should look like.
+        than to this page.
+      </p>
+      <p>
+        Having a measured ground makes the filings checkable against it. Well
+        by well, across the 2,446 wells with both a filed elevation and a grid
+        cell under them, the two agree in the middle and not in the tails: the
+        median difference is 0.6&nbsp;m, the quartiles are &minus;49&nbsp;m and
+        +31&nbsp;m, and <b>394 wells differ by more than 100&nbsp;m</b>. A
+        hundred metres is not a survey error. In those wells either the filed
+        elevation or the surface coordinate the well is mapped at is wrong,
+        and this site does not yet know which; the disagreement tracks neither
+        survey coverage nor lateral length. They are drawn anyway, because
+        leaving them out would be choosing the evidence.
+      </p>
+      <p>
+        Each wellbore hangs from the elevation filed with its own tops rather
+        than from this grid, even where the two disagree, because that is the
+        datum those tops were computed from and a well has to be internally
+        consistent before it is consistent with anything else. Seventy-one
+        wells had no usable filed elevation and hang from the 3DEP ground
+        instead.
       </p>
       <p>
         The township lines on that surface are the Bureau of Land Management's
@@ -319,7 +336,7 @@ function gossansStrata() {
       var pts = [];
       wells.forEach(function (w) {
         w.tops.forEach(function (t) {
-          if (t[0] === fi && t[2] !== null) pts.push(w.x, w.y, t[2] * 0.3048);
+          if (t[0] === fi && t[2] !== null) pts.push(w.x, w.y, t[2]);
         });
       });
       if (!pts.length) return;
@@ -343,10 +360,20 @@ function gossansStrata() {
           surveyed.push(w.path[i - 1][0], w.path[i - 1][1], w.path[i - 1][2]);
           surveyed.push(w.path[i][0], w.path[i][1], w.path[i][2]);
         }
+        // Many surveys begin below the surface: 253 of them here, one as
+        // much as 4 km down, because only the lateral was surveyed. The
+        // stem up to the ground is drawn in the unsurveyed colour, because
+        // that is what it is.
+        if (w.ground !== undefined && w.ground - w.path[0][2] > 30)
+          vertical.push(w.x, w.y, w.ground, w.path[0][0], w.path[0][1], w.path[0][2]);
       } else if (w.tops.length) {
         var zs = w.tops.map(function (t) { return t[2]; }).filter(function (z) { return z !== null; });
         if (zs.length < 1) return;
-        var top = Math.max.apply(null, zs) * 0.3048, bot = Math.min.apply(null, zs) * 0.3048;
+        // From the ground it was drilled from down to the deepest top filed
+        // for it. Vertical over the whole length is an assumption, and the
+        // colour and the text both say the survey is missing.
+        var bot = Math.min.apply(null, zs);
+        var top = (w.ground !== undefined) ? w.ground : Math.max.apply(null, zs);
         vertical.push(w.x, w.y, top, w.x, w.y, bot);
       }
     });
