@@ -996,8 +996,8 @@ def build_pages():
         "description": model_page.DESCRIPTION,
         "kicker": "Interactive model",
         "priority": "1.0",
-        "body": model_page.BODY,
-        "head_extra": model_page.HEAD_EXTRA,
+        "body": model_page.BODY + strata_page.EMBED,
+        "head_extra": model_page.HEAD_EXTRA + strata_page.HEAD_EXTRA,
     })
 
     pages.append({
@@ -1005,9 +1005,19 @@ def build_pages():
         "title": "%s | Gossans" % strata_page.TITLE,
         "description": strata_page.DESCRIPTION,
         "kicker": "Interactive model &middot; 3D",
-        "priority": "1.0",
-        "body": strata_page.BODY,
-        "head_extra": strata_page.HEAD_EXTRA,
+        "priority": "0.3",
+        "head_extra": ('<link rel="canonical" href="https://www.gossans.com/basin-model/">' '<meta http-equiv="refresh" content="0; url=/basin-model/#strata">'),
+        "body": """
+  <section class="thesis article">
+    <div class="crumb">Model &middot; Strata in three dimensions</div>
+    <h1>The 3D view now sits with the map.</h1>
+    <p class="standfirst">
+      The map and the three-dimensional view are on one page, because they
+      answer the same question from two directions.
+      <a href="/basin-model/#strata">Open it</a>.
+    </p>
+  </section>
+""",
     })
 
     pages.append({

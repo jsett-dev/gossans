@@ -26,7 +26,7 @@ HEAD_EXTRA = """
 <script defer
         src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>"""
 
-BODY = r"""
+HERO = r"""
   <section class="thesis article">
     <div class="crumb">Model &middot; Strata in three dimensions</div>
     <h1>The tops are measured. The surface between them is an argument.</h1>
@@ -40,9 +40,19 @@ BODY = r"""
     </p>
   </section>
 
-  <div class="block">
+"""
+
+SECTIONS = r"""
+  <div class="block" id="strata">
     <div class="rail"><b>View</b><span>Measured tops</span><span>and wellbores</span></div>
     <div class="col">
+      <h2>The same wells in three dimensions.</h2>
+      <p class="prose" style="color:var(--ink-2); margin-bottom:18px;">
+        Drag to rotate, scroll to zoom, hold shift to pan. Each mark is a
+        formation top at the depth an operator filed for it; each line is a
+        wellbore, following its filed survey where one exists and vertical
+        where none does.
+      </p>
       <div class="ctlgrp" id="ctl"></div>
       <div class="scenewrap">
         <canvas id="scene"></canvas>
@@ -423,5 +433,6 @@ if (document.readyState === "loading") {
 """
 
 
-BODY = "".join([BODY, "<style>", STYLE, "</style>",
-                "<script>", SCRIPT, "</script>"])
+EMBED = "".join([SECTIONS, "<style>", STYLE, "</style>",
+                 "<script>", SCRIPT, "</script>"])
+BODY = HERO + EMBED

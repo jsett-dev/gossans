@@ -432,7 +432,9 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
 
   function startMap(){
     if (typeof L === "undefined") { return setTimeout(startMap, 200); }
-    lmap = L.map("leaflet", {scrollWheelZoom:false});
+    // Wheel zoom on, to match the 3D view on the same page. Leaflet
+    // already pans by dragging.
+    lmap = L.map("leaflet", {scrollWheelZoom:true});
     cadastral(lmap);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 15, minZoom: 6,
