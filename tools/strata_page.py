@@ -49,10 +49,25 @@ PANE = r"""
         <canvas id="scene"></canvas>
         <div id="hud" class="hud">loading&hellip;</div>
         <div id="legend" class="legend3d"></div>
+        <div id="compass" class="compass" aria-hidden="true">
+          <svg viewBox="-50 -50 100 100">
+            <g id="rose">
+              <circle r="38" fill="none" stroke="currentColor" stroke-opacity=".35"></circle>
+              <path d="M0,-38 L7,-8 L0,-16 L-7,-8 Z" fill="#b7532e"></path>
+              <path d="M0,38 L7,8 L0,16 L-7,8 Z" fill="none" stroke="currentColor"
+                    stroke-opacity=".45"></path>
+              <text x="0" y="-41" text-anchor="middle">N</text>
+              <text x="44" y="4" text-anchor="middle">E</text>
+              <text x="0" y="48" text-anchor="middle">S</text>
+              <text x="-44" y="4" text-anchor="middle">W</text>
+            </g>
+          </svg>
+        </div>
       </div>
       <div class="panel">
         <h3>Display</h3>
         <div class="ctlgrp" id="ctl"></div>
+        <p class="orient" id="orient"></p>
         <p class="zoomhint">
           Drag to rotate, scroll to zoom, hold shift to pan. Each mark is a
           formation top at the depth an operator filed for it; each line is a
@@ -125,6 +140,14 @@ STYLE = r"""
   height: min(70vh, 620px); overflow: hidden; }
 .scenewrap canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 .scenewrap canvas:active { cursor: grabbing; }
+.compass { position: absolute; left: 12px; bottom: 12px; width: 78px; height: 78px;
+  color: var(--ink-3); background: var(--paper); border: 1px solid var(--rule);
+  border-radius: 50%; }
+.compass svg { width: 100%; height: 100%; display: block; }
+.compass text { font-family: var(--f-data); font-size: 13px; fill: currentColor; }
+.orient { font-family: var(--f-data); font-size: 11px; line-height: 1.7;
+  color: var(--ink-2); margin: 10px 0 0; }
+.orient b { color: var(--ink); }
 .hud { position: absolute; left: 12px; top: 12px; font-family: var(--f-data);
   font-size: 11px; line-height: 1.6; color: var(--ink-2); background: var(--paper);
   border: 1px solid var(--rule); padding: 8px 10px; max-width: 46ch; }
@@ -136,7 +159,10 @@ STYLE = r"""
   cursor: pointer; text-align: left; }
 .legend3d button[aria-pressed="false"] { opacity: .35; }
 .legend3d .sw { width: 11px; height: 11px; flex: none; }
-.legend3d .n { margin-left: auto; color: var(--ink-3); }
+.legend3d .n { margin-left: auto; color: var(--ink-3); padding-left: 8px; }
+.legend3d .d { display: block; font-style: normal; color: var(--ink-3); font-size: 10px; }
+.legend3d h4 { font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); margin: 0 0 6px; font-weight: 400; }
 """
 
 SCRIPT = r"""
@@ -340,13 +366,18 @@ function gossansStrata() {
   }
 
   function drawLegend() {
-    legend.innerHTML = "";
+    legend.innerHTML = "<h4>Median depth &middot; picks</h4>";
     data.formations.forEach(function (f, i) {
       var b = document.createElement("button");
       b.type = "button";
       b.setAttribute("aria-pressed", hidden[i] ? "false" : "true");
+      // The median depth and the number of picks behind it were a separate
+      // diagram on this page. They belong on the thing that draws the tops.
+      var d = (f.median_depth_ft === undefined || f.median_depth_ft === null)
+        ? "" : f.median_depth_ft.toLocaleString() + " ft";
       b.innerHTML = '<span class="sw" style="background:' + f.colour + '"></span>' +
-                    '<span>' + f.name + '</span><span class="n">' + f.tops + '</span>';
+                    '<span>' + f.name + '<i class="d">' + d + '</i></span>' +
+                    '<span class="n">' + f.tops + '</span>';
       b.addEventListener("click", function () {
         hidden[i] = !hidden[i];
         b.setAttribute("aria-pressed", hidden[i] ? "false" : "true");
@@ -385,6 +416,51 @@ function gossansStrata() {
       target.z + r * Math.cos(pitch));
     camera.up.set(0, 0, 1);
     camera.lookAt(target);
+    orient();
+  }
+
+  // Which way the camera is facing, in the terms a survey reader uses: a rose
+  // that turns with the view, the bearing of the line of sight as a quadrant
+  // bearing and an azimuth, and how far above horizontal the eye sits.
+  function orient() {
+    var rose = document.getElementById("rose"),
+        out = document.getElementById("orient");
+    if (!rose && !out) return;
+    camera.updateMatrixWorld();
+    var right = new THREE.Vector3(), up = new THREE.Vector3(), fwd = new THREE.Vector3();
+    camera.matrixWorld.extractBasis(right, up, fwd);
+    var north = new THREE.Vector3(0, 1, 0);
+    if (rose) {
+      // Screen angle of true north, measured clockwise from the top of the
+      // screen, which is exactly what the rose has to be turned by.
+      var a = Math.atan2(right.dot(north), up.dot(north)) * 180 / Math.PI;
+      rose.setAttribute("transform", "rotate(" + a.toFixed(1) + ")");
+    }
+    if (!out) return;
+    var look = new THREE.Vector3().subVectors(target, camera.position);
+    var az = (Math.atan2(look.x, look.y) * 180 / Math.PI + 360) % 360;
+    var ns = (az <= 90 || az >= 270) ? "N" : "S";
+    var ew = (az < 180) ? "E" : "W";
+    var q = (az <= 90) ? az : (az < 180) ? 180 - az : (az < 270) ? az - 180 : 360 - az;
+    var above = 90 - pitch * 180 / Math.PI;
+    var km = (dist / 1000);
+    out.innerHTML =
+      "Looking <b>" + ns + " " + q.toFixed(0) + "&deg; " + ew + "</b> " +
+      "(azimuth " + az.toFixed(0) + "&deg;)<br>" +
+      "Eye <b>" + (above >= 0 ? above.toFixed(0) + "&deg; above" : (-above).toFixed(0) + "&deg; below") +
+      "</b> horizontal, " + (km < 10 ? km.toFixed(1) : km.toFixed(0)) + " km out<br>" +
+      "<span id=\"where\"></span>";
+    where();
+  }
+
+  // Where the view is centred, in ground terms rather than scene metres.
+  function where() {
+    var el = document.getElementById("where");
+    if (!el || !data || !data.origin) return;
+    var mlat = 111132.0, mlon = 111320.0 * Math.cos(data.origin.lat * Math.PI / 180);
+    var lat = data.origin.lat + target.y / mlat,
+        lon = data.origin.lon + target.x / mlon;
+    el.innerHTML = "Centre " + lat.toFixed(4) + "&deg;N " + Math.abs(lon).toFixed(4) + "&deg;W";
   }
   function home() {
     var box = new THREE.Box3().setFromObject(root);

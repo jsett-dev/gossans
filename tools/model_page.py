@@ -57,10 +57,22 @@ BODY = r"""
             <i class="sw" style="border-color:#b7532e"></i> Quarter-quarters</label>
           <label><input id="lay-sma" type="checkbox">
             <i class="sw sma"></i> Surface ownership</label>
+          <label><input id="lay-model" type="checkbox" checked>
+            <i class="sw model"></i> Township model</label>
           <p class="zoomhint" id="zoomhint"></p>
+          <h3>Township model</h3>
+          <div class="ctlgrp" id="views"></div>
+          <div class="ctlgrp" id="fms"></div>
+          <div class="legend" id="modellegend"></div>
           <h3>Wells</h3>
           <div class="legend" id="maplegend"></div>
             </div>
+      </div>
+      <div class="detail" id="detail">
+        <b>Click a township.</b> Each six-mile square is filled by the measure
+        chosen above. Faint grey squares have wells but too few sound fits to
+        report a median, and are left blank rather than borrowed from their
+        neighbours. Unfilled squares have no wells at all.
       </div>
       <p class="detail" id="cadnote">
         Survey grid and surface ownership from the Bureau of Land Management,
@@ -81,43 +93,6 @@ BODY = r"""
       </p>
       </div>
 <!--PANE3D-->
-    </div>
-  </div>
-
-  <div class="block">
-    <div class="rail"><b>Model</b><span>Township and range</span></div>
-    <div class="col">
-      <div class="ctl">
-        <div class="ctlgrp" id="views"></div>
-        <div class="ctlgrp" id="fms"></div>
-      </div>
-      <div class="mapwrap">
-        <svg id="map" viewBox="0 0 760 560" role="img"
-             aria-label="Township and range map of the Powder River Basin"></svg>
-      </div>
-      <div class="legend" id="legend"></div>
-      <div class="detail" id="detail">
-        <b>Click a cell.</b> Each square is one survey township, six miles by
-        six. Hatched squares have wells but not enough of what the current view
-        needs. Empty squares have no wells at all. Neither is filled in from
-        its neighbours.
-      </div>
-    </div>
-  </div>
-
-  <div class="block">
-    <div class="rail"><b>Section</b><span>Stratigraphy</span></div>
-    <div class="col">
-      <h2>What is stacked underneath, and how well each layer is known.</h2>
-      <p class="prose" style="color:var(--ink-2); margin-bottom:20px;">
-        Median subsea depth of each formation top across the mapped area, with
-        the number of picks behind it. A layer with few picks is a layer this
-        model barely knows.
-      </p>
-      <div class="mapwrap">
-        <svg id="strat" viewBox="0 0 760 420" role="img"
-             aria-label="Stratigraphic column"></svg>
-      </div>
     </div>
   </div>
 
@@ -159,6 +134,10 @@ BODY = r"""
 .panel h3 + h3, .panel .legend + h3 { margin-top:16px; }
 .panel label { display:flex; align-items:center; gap:7px; padding:2px 0; cursor:pointer; }
 .panel .sw { width:13px; height:9px; border:1.5px solid var(--ink-3); flex:none; }
+.panel .sw.model { border:0; background:linear-gradient(90deg,#eeeeea,#b7532e); height:11px; }
+.panel .legend { display:block; margin-top:8px; }
+.panel .legend span { display:flex; align-items:center; gap:7px; padding:1px 0; }
+.panel .ctlgrp { margin-top:6px; }
 .panel .sw.sma { border:0; background:linear-gradient(90deg,#cfe0c5,#f0e2b8,#e6d3d3); height:11px; }
 .panel .zoomhint { color:var(--ink-3); margin:8px 0 0; font-size:11px; }
 .viewswitch { display:flex; gap:0; margin-bottom:14px; }
@@ -225,55 +204,30 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
                   Math.round(a[2]+(b[2]-a[2])*t)+")";
   }
 
-  function draw(){
-    var svg=$("map"); svg.innerHTML="";
-    var defs=el("defs");
-    var pat=el("pattern",{id:"thin",width:"6",height:"6",patternUnits:"userSpaceOnUse",
-      patternTransform:"rotate(45)"});
-    pat.appendChild(el("rect",{width:"6",height:"6",fill:"var(--paper-2)"}));
-    pat.appendChild(el("line",{x1:"0",y1:"0",x2:"0",y2:"6",stroke:"var(--rule)","stroke-width":"2"}));
-    defs.appendChild(pat); svg.appendChild(defs);
+  // The township model. This was an SVG grid of squares next to a map that
+  // draws the same townships from the survey polygons; now it is a layer on
+  // that map, so a reader is not asked to hold two pictures of one thing.
+  var modelLayer = null, cellBy = {}, band = {lo:0, hi:1, invert:false};
 
-    var cells=data.cells.filter(function(c){return c.twp&&c.rge;});
-    var twps=cells.map(function(c){return +c.twp;});
-    var rges=cells.map(function(c){return +c.rge;});
-    var tMin=Math.min.apply(null,twps), tMax=Math.max.apply(null,twps);
-    var rMin=Math.min.apply(null,rges), rMax=Math.max.apply(null,rges);
+  function modelStyle(f){
+    var c = cellBy[f.properties.label], v = c ? valueOf(c) : null;
+    if (v === null || v === undefined)
+      return {stroke:false, fillOpacity: (c && c.wells) ? 0.22 : 0, fillColor:"#8a9098"};
+    var t = (band.hi === band.lo) ? 0.5 : (v - band.lo) / (band.hi - band.lo);
+    return {stroke:false, fillOpacity:0.55, fillColor: shade(band.invert ? 1 - t : t)};
+  }
 
-    var pad=44, W=760-pad*2, H=560-pad*2;
-    var cw=W/(rMax-rMin+1), ch=H/(tMax-tMin+1);
-
-    var vals=cells.map(valueOf).filter(function(v){return v!==null&&v!==undefined;});
-    var lo=Math.min.apply(null,vals), hi=Math.max.apply(null,vals);
-    // Structure is depth below sea level: deeper should read as deeper.
-    var invert = (view.k==="struct");
-
-    cells.forEach(function(c){
-      // Range increases westward, so higher range sits further left.
-      var x=pad+(rMax-(+c.rge))*cw, y=pad+(tMax-(+c.twp))*ch;
-      var v=valueOf(c), fill;
-      if(v===null||v===undefined){
-        fill = c.wells ? "url(#thin)" : "none";
-      } else {
-        var f=(hi===lo)?0.5:(v-lo)/(hi-lo);
-        fill=shade(invert?1-f:f);
-      }
-      var g=el("g",{"class":"cell"});
-      g.appendChild(el("rect",{x:x+1,y:y+1,width:cw-2,height:ch-2,fill:fill,
-        stroke:"var(--rule)","stroke-width":"1"}));
-      g.addEventListener("click",function(){ sel=c; detail(); });
-      svg.appendChild(g);
-    });
-
-    for(var r=rMin;r<=rMax;r++){
-      if((rMax-r)%2) continue;
-      svg.appendChild(text(pad+(rMax-r)*cw+cw/2, pad-12, "R"+r+"W", "middle"));
-    }
-    for(var t=tMin;t<=tMax;t++){
-      if((tMax-t)%2) continue;
-      svg.appendChild(text(pad-10, pad+(tMax-t)*ch+ch/2+4, "T"+t+"N", "end"));
-    }
-    legend(lo,hi,invert);
+  function paintModel(){
+    if (!data) return;
+    var vals = data.cells.map(valueOf).filter(function(v){
+      return v !== null && v !== undefined; });
+    if (!vals.length) return;
+    band.lo = Math.min.apply(null, vals);
+    band.hi = Math.max.apply(null, vals);
+    // Structure is depth below sea level, so deeper has to read as deeper.
+    band.invert = (view.k === "struct");
+    if (modelLayer) { modelLayer.setStyle(modelStyle); modelLayer.bringToBack(); }
+    legend(band.lo, band.hi, band.invert);
   }
 
   function text(x,y,s,anchor){
@@ -283,7 +237,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
   }
 
   function legend(lo,hi,invert){
-    var L=$("legend"); L.innerHTML="";
+    var L=$("modellegend"); if(!L) return; L.innerHTML="";
     var parts=[];
     for(var i=0;i<5;i++){
       var f=i/4, v=lo+(hi-lo)*f;
@@ -295,10 +249,10 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     var hatchLabel = (view.k==="struct")
       ? "wells, but no picks for this formation"
       : "wells, but too few sound fits";
-    parts.push('<span><i class="sw" style="background:var(--paper-2);'+
-      'background-image:repeating-linear-gradient(45deg,var(--rule) 0 2px,transparent 2px 6px)"></i>'+
+    parts.push('<span><i class="sw" style="background:#8a9098;opacity:.35"></i>'+
       hatchLabel+'</span>');
-    parts.push('<span><i class="sw" style="background:transparent"></i>no wells at all</span>');
+    parts.push('<span><i class="sw" style="background:transparent;'+
+      'border:1px solid var(--rule)"></i>no wells at all</span>');
     L.innerHTML=parts.join("")+'<span style="color:var(--ink-3)">'+view.unit+'</span>';
   }
 
@@ -376,6 +330,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
   // of grid nobody can read until they have zoomed in.
   function cadastral(map){
     var loaded = {}, groups = {
+      model: L.layerGroup(),
       twp: L.layerGroup(), sec: L.layerGroup(), qq: L.layerGroup()
     };
     var sma = L.tileLayer(
@@ -389,12 +344,22 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       qq:  {color:"#b7532e", weight:0.4, fill:false, opacity:0.75}
     };
 
+    (data.cells || []).forEach(function(c){
+      cellBy[c.twp + "N " + c.rge + "W"] = c;
+    });
+
     fetch("/data/plss_townships.geojson").then(function(r){return r.json();})
       .then(function(g){
         L.geoJSON(g, {style: style.twp, onEachFeature: function(f, l){
           l.bindTooltip(f.properties.label,
             {permanent:true, direction:"center", className:"plsslab twp"});
         }}).addTo(groups.twp);
+        modelLayer = L.geoJSON(g, {style: modelStyle, onEachFeature: function(f, l){
+          var c = cellBy[f.properties.label];
+          if (!c) return;
+          l.on("click", function(){ sel = c; detail(); });
+        }}).addTo(groups.model);
+        paintModel();
       }).catch(function(){});
 
     // Which townships are on screen, from the township file we already have.
@@ -466,26 +431,11 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     bind("lay-sec", groups.sec);
     bind("lay-qq", groups.qq);
     bind("lay-sma", sma);
-    [groups.twp, groups.sec, groups.qq].forEach(function(g){ map.addLayer(g); });
+    bind("lay-model", groups.model);
+    // The fill goes on first so the survey lines and the wells sit above it.
+    [groups.model, groups.twp, groups.sec, groups.qq]
+      .forEach(function(g){ map.addLayer(g); });
     refresh();
-  }
-
-  function strat(){
-    var svg=$("strat"); svg.innerHTML="";
-    var rows=data.stratigraphy; if(!rows.length) return;
-    var deep=Math.min.apply(null,rows.map(function(r){return r.median;}));
-    var shal=Math.max.apply(null,rows.map(function(r){return r.median;}));
-    var pad=30, H=420-pad*2, maxPicks=Math.max.apply(null,rows.map(function(r){return r.picks;}));
-    rows.forEach(function(r){
-      var y=pad+(shal-r.median)/(shal-deep||1)*H;
-      var w=40+(r.picks/maxPicks)*300;
-      svg.appendChild(el("rect",{x:180,y:y-7,width:w,height:14,
-        fill:shade(0.25+0.5*(r.picks/maxPicks)),stroke:"var(--rule)"}));
-      var a=text(172,y+4,r.formation,"end"); svg.appendChild(a);
-      var b=text(190+w,y+4,r.median.toLocaleString()+" ft  ("+r.picks+" picks)");
-      svg.appendChild(b);
-    });
-    svg.appendChild(text(180,18,"bar length is how many picks stand behind the depth"));
   }
 
   function bars(){
@@ -508,7 +458,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     VIEWS.forEach(function(o){
       var b=document.createElement("button");
       b.textContent=o.label; b.setAttribute("aria-pressed", o===view);
-      b.onclick=function(){ view=o; controls(); draw(); };
+      b.onclick=function(){ view=o; controls(); paintModel(); };
       v.appendChild(b);
     });
     var f=$("fms"); f.innerHTML="";
@@ -518,7 +468,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     Object.keys(names).sort().slice(0,8).forEach(function(n){
       var b=document.createElement("button");
       b.textContent=n; b.setAttribute("aria-pressed", n===formation);
-      b.onclick=function(){ formation=n; controls(); draw(); };
+      b.onclick=function(){ formation=n; controls(); paintModel(); };
       f.appendChild(b);
     });
   }
@@ -600,7 +550,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
         "<span style='color:#777'>API " + p.api + "</span>");
       layer.addLayer(m);
     });
-    layer.addTo(lmap);
+    layer.addTo(lmap); sinkModel();
 
     var pts = wellData.features.map(function(f){
       return [f.geometry.coordinates[1], f.geometry.coordinates[0]]; });
@@ -636,6 +586,8 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     }
   }
 
+  function sinkModel(){ if (modelLayer) modelLayer.bringToBack(); }
+
   function mapControls(){
     var v = document.getElementById("mapviews"); v.innerHTML = "";
     MAPVIEWS.forEach(function(o){
@@ -658,7 +610,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     formation=Object.keys(names).sort()[0]||null;
     $("unknown").innerHTML=(j.unknown||[]).map(function(u){
       return "<li>"+u+"</li>";}).join("");
-    controls(); draw(); strat(); bars(); startMap();
+    controls(); bars(); startMap();
   }).catch(function(e){
     $("hdr").textContent="Could not load the basin data: "+e;
   });
