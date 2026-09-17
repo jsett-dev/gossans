@@ -1123,9 +1123,17 @@ function gossansStrata() {
       var dx = e.clientX - down.x, dy = e.clientY - down.y;
       down.x = e.clientX; down.y = e.clientY;
       if (down.pan) {
+        // Pan along the camera's own right and up axes. The previous version
+        // derived them from yaw by hand and had both horizontal terms
+        // inverted, so the scene moved opposite to the drag. Taking the basis
+        // from the camera matrix is right at any orientation, including when
+        // looking from below, where the hand-rolled version also failed.
         var k = dist / 900;
-        target.x -= (dx * Math.sin(yaw) + dy * Math.cos(yaw) * 0.3) * k;
-        target.y += (dx * Math.cos(yaw) - dy * Math.sin(yaw) * 0.3) * k;
+        camera.updateMatrixWorld();
+        var right = new THREE.Vector3(), up = new THREE.Vector3(), fwd = new THREE.Vector3();
+        camera.matrixWorld.extractBasis(right, up, fwd);
+        target.addScaledVector(right, -dx * k);
+        target.addScaledVector(up, dy * k);
       } else {
         yaw -= dx * 0.006;
         pitch = Math.max(0.05, Math.min(Math.PI - 0.05, pitch - dy * 0.006));
