@@ -38,7 +38,22 @@ BODY = r"""
     <div class="rail"><b>Map</b><span>Every well we hold</span></div>
     <div class="col">
       <div class="ctl"><div class="ctlgrp" id="mapviews"></div></div>
+      <div class="ctlgrp" id="cadctl">
+        <label class="ctl"><input id="lay-twp" type="checkbox"> Township and range</label>
+        <label class="ctl"><input id="lay-sec" type="checkbox"> Sections</label>
+        <label class="ctl"><input id="lay-qq" type="checkbox"> Quarter-quarters</label>
+        <label class="ctl"><input id="lay-sma" type="checkbox"> Surface ownership</label>
+      </div>
       <div id="leaflet" class="leafwrap"></div>
+      <p class="detail" id="cadnote">
+        Survey grid and surface ownership from the Bureau of Land Management,
+        provided as is. In BLM's words, these data are neither legal documents
+        nor land surveys and must not be used as such: the grid is drawn for
+        reference, not to determine anybody's corner. Sections and
+        quarter-quarters load for the townships on screen, so zoom in to see
+        them. Surface ownership shows which agency administers the surface, and
+        says nothing about who owns the minerals underneath.
+      </p>
       <div class="legend" id="maplegend"></div>
       <p class="prose" style="color:var(--ink-2); margin-top:14px; font-size:14px;">
         Filled circles carry a number. Dashed circles are wells whose decline
@@ -266,6 +281,94 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     d.innerHTML=s.join("<br>");
   }
 
+  // ---------------------------------------------------------------- cadastral
+  // Townships come as one file. Sections and quarter-quarters are per
+  // township, fetched as the map moves, because all of them at once is 42 MB
+  // of grid nobody can read until they have zoomed in.
+  function cadastral(map){
+    var loaded = {}, groups = {
+      twp: L.layerGroup(), sec: L.layerGroup(), qq: L.layerGroup()
+    };
+    var sma = L.tileLayer(
+      "https://gis.blm.gov/arcgis/rest/services/lands/BLM_Natl_SMA_Cached_with_PriUnk/MapServer/tile/{z}/{y}/{x}",
+      { opacity: 0.45, maxZoom: 16,
+        attribution: "Surface management agency: BLM" });
+
+    var style = {
+      twp: {color:"#54606b", weight:1.4, fill:false},
+      sec: {color:"#8a9098", weight:0.7, fill:false},
+      qq:  {color:"#b7532e", weight:0.4, fill:false, opacity:0.75}
+    };
+
+    fetch("/data/plss_townships.geojson").then(function(r){return r.json();})
+      .then(function(g){
+        L.geoJSON(g, {style: style.twp, onEachFeature: function(f, l){
+          l.bindTooltip(f.properties.label, {sticky:true});
+        }}).addTo(groups.twp);
+      }).catch(function(){});
+
+    // Which townships are on screen, from the township file we already have.
+    var twpIndex = [];
+    fetch("/data/plss/index.json").then(function(r){return r.json();})
+      .then(function(ix){ twpIndex = Object.keys(ix); refresh(); }).catch(function(){});
+
+    function wantedIds(){
+      var out = [], b = map.getBounds();
+      groups.twp.eachLayer(function(gl){
+        gl.eachLayer && gl.eachLayer(function(l){
+          if (l.getBounds && b.intersects(l.getBounds()) && l.feature)
+            out.push(l.feature.properties.plssid);
+        });
+      });
+      return out;
+    }
+
+    function fetchInto(kind, id){
+      var key = kind + id;
+      if (loaded[key]) return;
+      loaded[key] = true;
+      var url = kind === "sec" ? "/data/plss/sec_" + id + ".geojson"
+                               : "/data/plss/" + id + ".geojson";
+      fetch(url).then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(g){
+          if (!g) return;
+          L.geoJSON(g, {style: style[kind], onEachFeature: function(f, l){
+            var t = kind === "sec" ? "Sec " + f.properties.sec
+                                   : f.properties.q + " (" + f.properties.ac + " ac)";
+            l.bindTooltip(t, {sticky:true});
+          }}).addTo(groups[kind]);
+        }).catch(function(){});
+    }
+
+    function refresh(){
+      var z = map.getZoom();
+      if (map.hasLayer(groups.sec) && z >= 11)
+        wantedIds().forEach(function(id){ fetchInto("sec", id); });
+      if (map.hasLayer(groups.qq) && z >= 13)
+        wantedIds().forEach(function(id){ fetchInto("qq", id); });
+      var note = document.getElementById("cadnote");
+      if (!note) return;
+      if ((map.hasLayer(groups.qq) && z < 13) || (map.hasLayer(groups.sec) && z < 11))
+        note.dataset.hint = "zoom";
+      else
+        delete note.dataset.hint;
+    }
+    map.on("moveend zoomend", refresh);
+
+    function bind(id, layer){
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener("change", function(){
+        if (el.checked) map.addLayer(layer); else map.removeLayer(layer);
+        refresh();
+      });
+    }
+    bind("lay-twp", groups.twp);
+    bind("lay-sec", groups.sec);
+    bind("lay-qq", groups.qq);
+    bind("lay-sma", sma);
+  }
+
   function strat(){
     var svg=$("strat"); svg.innerHTML="";
     var rows=data.stratigraphy; if(!rows.length) return;
@@ -330,6 +433,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
   function startMap(){
     if (typeof L === "undefined") { return setTimeout(startMap, 200); }
     lmap = L.map("leaflet", {scrollWheelZoom:false});
+    cadastral(lmap);
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 15, minZoom: 6,
       attribution: 'Basemap &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. ' +
