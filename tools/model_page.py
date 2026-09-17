@@ -35,16 +35,30 @@ BODY = r"""
   </section>
 
   <div class="block">
-    <div class="rail"><b>Map</b><span>Every well we hold</span></div>
+    <div class="rail"><b>Views</b><span>Map and 3D</span></div>
     <div class="col">
-      <div class="ctl"><div class="ctlgrp" id="mapviews"></div></div>
-      <div class="ctlgrp" id="cadctl">
-        <label class="ctl"><input id="lay-twp" type="checkbox"> Township and range</label>
-        <label class="ctl"><input id="lay-sec" type="checkbox"> Sections</label>
-        <label class="ctl"><input id="lay-qq" type="checkbox"> Quarter-quarters</label>
-        <label class="ctl"><input id="lay-sma" type="checkbox"> Surface ownership</label>
+      <div class="viewswitch">
+        <a class="vs on" href="#mapview">Map</a>
+        <a class="vs" href="#strata">Three dimensions</a>
       </div>
-      <div id="leaflet" class="leafwrap"></div>
+      <div class="ctl"><div class="ctlgrp" id="mapviews"></div></div>
+      <div id="mapview" class="maprow">
+        <div id="leaflet" class="leafwrap"></div>
+        <div class="panel" id="layers">
+          <h3>Layers</h3>
+          <label><input id="lay-twp" type="checkbox" checked>
+            <i class="sw" style="border-color:#54606b"></i> Township and range</label>
+          <label><input id="lay-sec" type="checkbox" checked>
+            <i class="sw" style="border-color:#8a9098"></i> Sections</label>
+          <label><input id="lay-qq" type="checkbox" checked>
+            <i class="sw" style="border-color:#b7532e"></i> Quarter-quarters</label>
+          <label><input id="lay-sma" type="checkbox">
+            <i class="sw sma"></i> Surface ownership</label>
+          <p class="zoomhint" id="zoomhint"></p>
+          <h3>Wells</h3>
+          <div class="legend" id="maplegend"></div>
+            </div>
+      </div>
       <p class="detail" id="cadnote">
         Survey grid and surface ownership from the Bureau of Land Management,
         provided as is. In BLM's words, these data are neither legal documents
@@ -54,7 +68,6 @@ BODY = r"""
         them. Surface ownership shows which agency administers the surface, and
         says nothing about who owns the minerals underneath.
       </p>
-      <div class="legend" id="maplegend"></div>
       <p class="prose" style="color:var(--ink-2); margin-top:14px; font-size:14px;">
         Filled circles carry a number. Dashed circles are wells whose decline
         fit was refused, so we will not claim a recovery for them. Plain hollow
@@ -131,7 +144,33 @@ BODY = r"""
   </div>
 
 <style>
-.leafwrap { height:520px; border:1px solid var(--rule); background:var(--paper-2); }
+.leafwrap { height:560px; border:1px solid var(--rule); background:var(--paper-2); }
+.maprow { display:grid; grid-template-columns: minmax(0,1fr) 230px; gap:14px; align-items:stretch; }
+@media (max-width: 860px) { .maprow { grid-template-columns: minmax(0,1fr); } }
+.panel { border:1px solid var(--rule); padding:12px 13px; font-family:var(--f-data);
+  font-size:11.5px; line-height:1.6; overflow-y:auto; max-height:560px; }
+.panel h3 { font-family:var(--f-data); font-size:10px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--ink-3); margin:0 0 7px; }
+.panel h3 + h3, .panel .legend + h3 { margin-top:16px; }
+.panel label { display:flex; align-items:center; gap:7px; padding:2px 0; cursor:pointer; }
+.panel .sw { width:13px; height:9px; border:1.5px solid var(--ink-3); flex:none; }
+.panel .sw.sma { border:0; background:linear-gradient(90deg,#cfe0c5,#f0e2b8,#e6d3d3); height:11px; }
+.panel .zoomhint { color:var(--ink-3); margin:8px 0 0; font-size:11px; }
+.viewswitch { display:flex; gap:0; margin-bottom:14px; }
+.viewswitch .vs { font-family:var(--f-data); font-size:11px; letter-spacing:.14em;
+  text-transform:uppercase; padding:8px 16px; border:1px solid var(--rule);
+  text-decoration:none; color:var(--ink-2); }
+.viewswitch .vs + .vs { border-left:0; }
+.viewswitch .vs:hover { color:var(--ink); }
+.viewswitch .vs.on { background:var(--paper-3); color:var(--ink); }
+/* Grid labels: drawn always, revealed by zoom. Hiding them with CSS avoids
+   rebinding thousands of tooltips every time the map moves. */
+.plsslab { background:none; border:0; box-shadow:none; color:var(--ink-3);
+  font-family:var(--f-data); font-size:10px; padding:0; }
+.plsslab.twp { color:var(--ink-2); font-size:11px; }
+.plsslab.qq { font-size:9px; color:var(--redline); }
+.lz-twp .plsslab.twp, .lz-sec .plsslab.sec, .lz-qq .plsslab.qq { display:block; }
+.plsslab.twp, .plsslab.sec, .plsslab.qq { display:none; }
 .leafwrap .leaflet-container { background:var(--paper-2); font-family:var(--f-data); }
 .leafwrap .leaflet-popup-content { font-family:var(--f-data); font-size:12px;
   line-height:1.7; }
@@ -303,7 +342,8 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     fetch("/data/plss_townships.geojson").then(function(r){return r.json();})
       .then(function(g){
         L.geoJSON(g, {style: style.twp, onEachFeature: function(f, l){
-          l.bindTooltip(f.properties.label, {sticky:true});
+          l.bindTooltip(f.properties.label,
+            {permanent:true, direction:"center", className:"plsslab twp"});
         }}).addTo(groups.twp);
       }).catch(function(){});
 
@@ -333,25 +373,34 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
         .then(function(g){
           if (!g) return;
           L.geoJSON(g, {style: style[kind], onEachFeature: function(f, l){
-            var t = kind === "sec" ? "Sec " + f.properties.sec
-                                   : f.properties.q + " (" + f.properties.ac + " ac)";
-            l.bindTooltip(t, {sticky:true});
+            var t = kind === "sec" ? f.properties.sec : f.properties.q;
+            l.bindTooltip(String(t), {permanent:true, direction:"center",
+                                      className:"plsslab " + kind});
           }}).addTo(groups[kind]);
         }).catch(function(){});
     }
 
+    // One place decides both what is fetched and what is legible. Labels are
+    // in the DOM from the moment a layer loads and are revealed by these
+    // classes, which is far cheaper than rebinding tooltips on every move.
+    var SHOW = { twp: 9, sec: 11, qq: 14 };
     function refresh(){
-      var z = map.getZoom();
-      if (map.hasLayer(groups.sec) && z >= 11)
+      var z = map.getZoom(), c = map.getContainer();
+      if (map.hasLayer(groups.sec) && z >= SHOW.sec)
         wantedIds().forEach(function(id){ fetchInto("sec", id); });
       if (map.hasLayer(groups.qq) && z >= 13)
         wantedIds().forEach(function(id){ fetchInto("qq", id); });
-      var note = document.getElementById("cadnote");
-      if (!note) return;
-      if ((map.hasLayer(groups.qq) && z < 13) || (map.hasLayer(groups.sec) && z < 11))
-        note.dataset.hint = "zoom";
+      ["twp","sec","qq"].forEach(function(k){
+        c.classList.toggle("lz-" + k, z >= SHOW[k] && map.hasLayer(groups[k]));
+      });
+      var hint = document.getElementById("zoomhint");
+      if (!hint) return;
+      if (map.hasLayer(groups.qq) && z < SHOW.qq)
+        hint.textContent = "Zoom in for quarter-quarter labels.";
+      else if (map.hasLayer(groups.sec) && z < SHOW.sec)
+        hint.textContent = "Zoom in for section numbers.";
       else
-        delete note.dataset.hint;
+        hint.textContent = "";
     }
     map.on("moveend zoomend", refresh);
 
@@ -367,6 +416,8 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     bind("lay-sec", groups.sec);
     bind("lay-qq", groups.qq);
     bind("lay-sma", sma);
+    [groups.twp, groups.sec, groups.qq].forEach(function(g){ map.addLayer(g); });
+    refresh();
   }
 
   function strat(){
