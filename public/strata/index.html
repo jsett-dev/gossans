@@ -3,22 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The strata, in three dimensions, with nothing drawn between the wells | Gossans</title>
-<meta name="description" content="Formation tops and wellbore paths in the Powder River Basin, in 3D, built from Wyoming's filings. Every point is a measurement. No surface is drawn between wells, because nothing was measured there.">
+<title>The strata in three dimensions, and where the surfaces stop | Gossans</title>
+<meta name="description" content="Formation tops and wellbore paths in the Powder River Basin, in 3D, built from Wyoming's filings. Measurements by default. Interpolated surfaces can be switched on, and stop where well control does.">
 <link rel="canonical" href="https://www.gossans.com/strata/">
 
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Gossans">
 <meta property="og:url" content="https://www.gossans.com/strata/">
-<meta property="og:title" content="The strata, in three dimensions, with nothing drawn between the wells | Gossans">
-<meta property="og:description" content="Formation tops and wellbore paths in the Powder River Basin, in 3D, built from Wyoming's filings. Every point is a measurement. No surface is drawn between wells, because nothing was measured there.">
+<meta property="og:title" content="The strata in three dimensions, and where the surfaces stop | Gossans">
+<meta property="og:description" content="Formation tops and wellbore paths in the Powder River Basin, in 3D, built from Wyoming's filings. Measurements by default. Interpolated surfaces can be switched on, and stop where well control does.">
 <meta property="og:image" content="https://www.gossans.com/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://www.gossans.com/og-image.png">
-<meta name="twitter:title" content="The strata, in three dimensions, with nothing drawn between the wells | Gossans">
-<meta name="twitter:description" content="Formation tops and wellbore paths in the Powder River Basin, in 3D, built from Wyoming's filings. Every point is a measurement. No surface is drawn between wells, because nothing was measured there.">
+<meta name="twitter:title" content="The strata in three dimensions, and where the surfaces stop | Gossans">
+<meta name="twitter:description" content="Formation tops and wellbore paths in the Powder River Basin, in 3D, built from Wyoming's filings. Measurements by default. Interpolated surfaces can be switched on, and stop where well control does.">
 
 <meta name="theme-color" content="#f1f2ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14181a" media="(prefers-color-scheme: dark)">
@@ -796,11 +796,12 @@ img, svg, video { max-width: 100%; height: auto; }
 
   <section class="thesis article">
     <div class="crumb">Model &middot; Strata in three dimensions</div>
-    <h1>The layers are real. The surfaces between them would not be.</h1>
+    <h1>The tops are measured. The surface between them is an argument.</h1>
     <p class="standfirst">
       Drag to rotate, scroll to zoom, hold shift to pan. Each mark is a
       formation top at the depth an operator filed for it. Each line is a
-      wellbore. Where a well has a directional survey on file the path is the
+      wellbore. Interpolated surfaces can be switched on, and stop where the
+      wells do. Where a well has a directional survey on file the path is the
       one it describes; where it has none the line is vertical, because that is
       all the record supports.
     </p>
@@ -823,10 +824,20 @@ img, svg, video { max-width: 100%; height: auto; }
     <div class="rail"><b>Honesty</b><span>What is not here</span></div>
     <div class="col prose">
       <p>
-        There is no layer cake. A surface joining one well's Niobrara top to
-        the next well's is a guess about everything in between, and at this
-        well spacing that is mostly guess. Drawn in three dimensions and
-        shaded, it would look like knowledge.
+        Surfaces are available and are off until you ask for them, because a
+        surface joining one well's Niobrara top to the next well's is a
+        statement about ground nobody drilled. Switched on, each one is a
+        weighted average of the tops around it, and it is drawn only where
+        there is well control: at least three tops within eight kilometres,
+        the nearest within four. Everywhere else stays empty, which is why the
+        surfaces have ragged edges and holes. Across ten formations, 17,251
+        cells could be computed and 42,269 could not.
+      </p>
+      <p>
+        Colour fades toward the page as the nearest well gets further away, so
+        thinly supported ground looks thin. Inverse distance weighting is used
+        rather than anything smoother on purpose: smoothness is the quality
+        that makes an interpolated surface look like knowledge.
       </p>
       <p>
         Two other limits are worth stating plainly. <b id="nsurv"></b> of the
@@ -871,13 +882,20 @@ function gossansStrata() {
   function fail(msg) { hud.textContent = msg; }
   if (!window.THREE) { fail("The 3D library did not load, so this view cannot draw."); return; }
 
-  var EXAG = 15, showPaths = true, onlySurveyed = false, data = null, hidden = {};
-  var renderer, scene, camera, root, tops = [], lines = [];
+  var EXAG = 15, showPaths = true, onlySurveyed = false, showSurfaces = false;
+  var data = null, surf = null, hidden = {};
+  var renderer, scene, camera, root, tops = [], lines = [], meshes = [];
 
-  fetch("/data/strata.json").then(function (r) {
-    if (!r.ok) throw new Error(r.status);
-    return r.json();
-  }).then(function (d) { data = d; build(); }).catch(function () {
+  Promise.all([
+    fetch("/data/strata.json").then(function (r) {
+      if (!r.ok) throw new Error(r.status); return r.json(); }),
+    // The surfaces are optional. If they fail to load the measured view still
+    // works, which is the right way round for a layer that is inference.
+    fetch("/data/surfaces.json").then(function (r) {
+      return r.ok ? r.json() : null; }).catch(function () { return null; })
+  ]).then(function (both) {
+    data = both[0]; surf = both[1]; build();
+  }).catch(function () {
     fail("Could not load the strata data.");
   });
 
@@ -886,6 +904,7 @@ function gossansStrata() {
       '<label class="ctl">Vertical exaggeration <input id="ex" type="range" min="1" max="40" step="1" value="' + EXAG + '"> <b id="exv">' + EXAG + '&times;</b></label>' +
       '<label class="ctl"><input id="cp" type="checkbox" checked> Wellbores</label>' +
       '<label class="ctl"><input id="cs" type="checkbox"> Only wells with a survey</label>' +
+      '<label class="ctl"><input id="cf" type="checkbox"> Interpolated surfaces</label>' +
       '<button class="ctl" id="reset" type="button">Reset view</button>';
     document.getElementById("ex").addEventListener("input", function (e) {
       EXAG = +e.target.value;
@@ -897,6 +916,14 @@ function gossansStrata() {
     });
     document.getElementById("cs").addEventListener("change", function (e) {
       onlySurveyed = e.target.checked; rebuild();
+    });
+    document.getElementById("cf").addEventListener("change", function (e) {
+      showSurfaces = e.target.checked;
+      applyVisible();
+      hud.innerHTML = showSurfaces
+        ? "Surfaces are <b>interpolated</b>: a weighted average of nearby filed "
+          + "tops, not measurements. They stop where well control does."
+        : "Measured tops and wellbores only. Nothing is drawn between wells.";
     });
     document.getElementById("reset").addEventListener("click", home);
   }
@@ -978,9 +1005,57 @@ function gossansStrata() {
       lines.push(l); root.add(l);
     });
 
+    buildSurfaces();
     drawLegend();
     applyScale();
     applyVisible();
+  }
+
+  // One mesh per formation, built from the gridded surface. A cell is drawn
+  // only where all four of its corners were computed, so the mesh stops at
+  // the edge of well control instead of tapering into ground nobody drilled.
+  // Colour is mixed toward the page background as the nearest control point
+  // gets further away, so thin support looks thin.
+  function buildSurfaces() {
+    meshes = [];
+    if (!surf) return;
+    var g = surf.grid;
+    surf.surfaces.forEach(function (sf) {
+      var z = sf.z_ft, dm = sf.nearest_control_m;
+      var pos = [], col = [], base = new THREE.Color(sf.colour);
+      var pale = new THREE.Color("#efe9dd");
+      function at(gx, gy) { return gy * g.nx + gx; }
+      for (var gy = 0; gy < g.ny - 1; gy++) {
+        for (var gx = 0; gx < g.nx - 1; gx++) {
+          var i00 = at(gx, gy), i10 = at(gx + 1, gy),
+              i01 = at(gx, gy + 1), i11 = at(gx + 1, gy + 1);
+          if (z[i00] === null || z[i10] === null ||
+              z[i01] === null || z[i11] === null) continue;
+          var xs = [g.x0 + gx * g.cell_m, g.x0 + (gx + 1) * g.cell_m];
+          var ys = [g.y0 + gy * g.cell_m, g.y0 + (gy + 1) * g.cell_m];
+          var quad = [[xs[0], ys[0], z[i00], dm[i00]], [xs[1], ys[0], z[i10], dm[i10]],
+                      [xs[1], ys[1], z[i11], dm[i11]], [xs[0], ys[0], z[i00], dm[i00]],
+                      [xs[1], ys[1], z[i11], dm[i11]], [xs[0], ys[1], z[i01], dm[i01]]];
+          quad.forEach(function (v) {
+            pos.push(v[0], v[1], v[2] * 0.3048);
+            var t = Math.min(1, (v[3] || 0) / 4000);
+            var c = base.clone().lerp(pale, t * 0.75);
+            col.push(c.r, c.g, c.b);
+          });
+        }
+      }
+      if (!pos.length) return;
+      var geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+      var mat = new THREE.MeshBasicMaterial({
+        vertexColors: true, transparent: true, opacity: 0.6,
+        side: THREE.DoubleSide, depthWrite: false });
+      var m = new THREE.Mesh(geo, mat);
+      m.userData = { name: sf.name };
+      meshes.push(m);
+      root.add(m);
+    });
   }
 
   function drawLegend() {
@@ -1005,6 +1080,10 @@ function gossansStrata() {
   function applyVisible() {
     tops.forEach(function (p) { p.visible = !hidden[p.userData.formation]; });
     lines.forEach(function (l) { l.visible = showPaths; });
+    meshes.forEach(function (m) {
+      var i = data.formations.findIndex(function (f) { return f.name === m.userData.name; });
+      m.visible = showSurfaces && !hidden[i];
+    });
   }
 
   // ---- camera: drag to rotate, wheel to zoom, shift or right button to pan
