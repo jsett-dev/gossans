@@ -739,6 +739,26 @@ header.plate { padding: 40px 0 0; }
   .navbar .inner { padding: 8px 20px; }
   .navbar .mini span:last-child { display: none; }
 }
+
+/* Four readers, four uses. Two up on a laptop, one up on a phone, so a
+   column never carries a single orphaned card. */
+.four {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 26px 34px;
+}
+.four h3 {
+  font-family: var(--f-data);
+  font-size: 11px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--redline);
+  margin: 0 0 8px;
+  padding-top: 10px;
+  border-top: 2px solid var(--redline);
+}
+.four p { font-size: 14.5px; line-height: 1.65; color: var(--ink-2); margin: 0; }
+@media (max-width: 700px) { .four { grid-template-columns: minmax(0, 1fr); gap: 22px; } }
 @media (max-width: 700px) { .topnav { gap: 14px; font-size: 10px; } }
 </style>
 </head>
@@ -816,6 +836,65 @@ header.plate { padding: 40px 0 0; }
 
   <!-- ============================================================ -->
   <div class="block">
+    <div class="rail"><b>Who</b><span>Four readers</span><span>One record</span></div>
+    <div class="col">
+      <h2>One record of what has been recovered, and what the filings will
+          support saying about it.</h2>
+      <p class="prose" style="color:var(--ink-2); margin-bottom:22px;">
+        The same public filings answer four different questions, and the answer
+        is only as good as the coverage behind it. Each of these says what the
+        record supports today, not what it might support later. Where the
+        coverage is thin it is
+        <a href="/data/">stated on the data page</a> rather than smoothed over.
+      </p>
+      <div class="four">
+        <div>
+          <h3>Landowners and mineral owners</h3>
+          <p>
+            Which wells run under your section and for how many feet of filed
+            survey, what they have reported month by month, and how that
+            production has behaved against its own history rather than a type
+            curve. The first use this was built for, and the most complete.
+          </p>
+        </div>
+        <div>
+          <h3>Developers and operators</h3>
+          <p>
+            Completion intensity, spacing and outturn across the whole
+            population rather than the offsets somebody chose to show you.
+            Where sand per foot stopped buying barrels, and which years show
+            no gain at all.
+          </p>
+        </div>
+        <div>
+          <h3>Targeting</h3>
+          <p>
+            Where the record is present, where it is absent, and where two
+            agencies disagree. Sections with light completions beside
+            neighbours completed four times harder are findable, and are
+            reported as what the filings show, never as a recommendation.
+          </p>
+        </div>
+        <div>
+          <h3>Production tracking</h3>
+          <p>
+            Monthly volumes by well, reloaded from the state and stamped with
+            the retrieval they came from, so any figure here can be traced to
+            a fetch on a date. Reporting lags the month; the lag is shown
+            rather than filled in.
+          </p>
+        </div>
+      </div>
+      <p class="detail" style="margin-top:20px;">
+        Nothing on this page is an appraisal, a reserve report, or engineering
+        advice, and none of it is offered as any. It is the public record,
+        assembled, with its gaps left visible.
+      </p>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <div class="block">
     <div class="rail"><b>Position</b><span>What we sell</span></div>
     <div class="col prose">
       <h2>The information gap in a mineral transaction is not an accident. It is the business model.</h2>
@@ -834,7 +913,7 @@ header.plate { padding: 40px 0 0; }
         owner rather than at the buyer.
       </p>
       <p>
-        That is the whole of what Gossans does. We hold 2,570 wells, 277,836
+        That gap is where this started. We hold 2,570 wells, 277,836
         months of production and 228,619 survey stations for the Powder River
         Basin, indexed by section, township and range. From that we can tell
         you which wells actually run under your tract and for how many feet,

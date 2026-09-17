@@ -37,9 +37,11 @@ BODY = r"""
   <div class="block">
     <div class="rail"><b>Views</b><span>Map and 3D</span></div>
     <div class="col">
-      <div class="viewswitch">
-        <a class="vs on" data-view="map" href="#mapview">Map</a>
-        <a class="vs" data-view="strata" href="#strata">Three dimensions</a>
+      <div class="viewswitch" role="tablist" aria-label="Basin view">
+        <a class="vs on" role="tab" aria-selected="true" data-view="map"
+           href="#mapview">Map</a>
+        <a class="vs" role="tab" aria-selected="false" data-view="strata"
+           href="#strata">Three dimensions</a>
       </div>
       <div id="mapview" class="pane">
       <div class="ctl"><div class="ctlgrp" id="mapviews"></div></div>
@@ -342,7 +344,9 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       mapPane.classList.toggle("paneoff", !wantMap);
       strataPane.classList.toggle("paneoff", wantMap);
       tabs.forEach(function(t){
-        t.classList.toggle("on", (t.dataset.view === which));
+        var on = t.dataset.view === which;
+        t.classList.toggle("on", on);
+        t.setAttribute("aria-selected", on ? "true" : "false");
       });
       var v = window.gossansViews || {};
       if (wantMap && v.map) { v.map.invalidateSize(); }
@@ -352,9 +356,18 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       t.addEventListener("click", function(e){
         e.preventDefault();
         show(t.dataset.view);
+        // The view goes in the address bar so a reload, a bookmark or a
+        // link somebody sends on opens the view they were looking at.
+        if (history.replaceState)
+          history.replaceState(null, "", "#" + t.dataset.view);
       });
     });
-    show("map");
+    // /strata/ redirects here with #strata, and anything linking to the
+    // scene does the same, so arrive on the view that was asked for.
+    show(location.hash === "#strata" ? "strata" : "map");
+    addEventListener("hashchange", function(){
+      show(location.hash === "#strata" ? "strata" : "map");
+    });
   }
 
   // ---------------------------------------------------------------- cadastral
