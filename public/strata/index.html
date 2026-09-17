@@ -905,6 +905,7 @@ function gossansStrata() {
       '<label class="ctl"><input id="cp" type="checkbox" checked> Wellbores</label>' +
       '<label class="ctl"><input id="cs" type="checkbox"> Only wells with a survey</label>' +
       '<label class="ctl"><input id="cf" type="checkbox"> Interpolated surfaces</label>' +
+      '<button class="ctl" id="allstrata" type="button">Hide all strata</button>' +
       '<button class="ctl" id="reset" type="button">Reset view</button>';
     document.getElementById("ex").addEventListener("input", function (e) {
       EXAG = +e.target.value;
@@ -924,6 +925,15 @@ function gossansStrata() {
         ? "Surfaces are <b>interpolated</b>: a weighted average of nearby filed "
           + "tops, not measurements. They stop where well control does."
         : "Measured tops and wellbores only. Nothing is drawn between wells.";
+    });
+    document.getElementById("allstrata").addEventListener("click", function () {
+      // Hiding every formation leaves the wellbores, which is the useful
+      // state: the holes on their own, with nothing draped on them.
+      var anyShown = data.formations.some(function (f, i) { return !hidden[i]; });
+      data.formations.forEach(function (f, i) { hidden[i] = anyShown; });
+      this.textContent = anyShown ? "Show all strata" : "Hide all strata";
+      drawLegend();
+      applyVisible();
     });
     document.getElementById("reset").addEventListener("click", home);
   }
@@ -1069,10 +1079,18 @@ function gossansStrata() {
       b.addEventListener("click", function () {
         hidden[i] = !hidden[i];
         b.setAttribute("aria-pressed", hidden[i] ? "false" : "true");
+        syncAllButton();
         applyVisible();
       });
       legend.appendChild(b);
     });
+  }
+
+  function syncAllButton() {
+    var btn = document.getElementById("allstrata");
+    if (!btn) return;
+    var anyShown = data.formations.some(function (f, i) { return !hidden[i]; });
+    btn.textContent = anyShown ? "Hide all strata" : "Show all strata";
   }
 
   function applyScale() { root.scale.set(1, 1, EXAG); }
