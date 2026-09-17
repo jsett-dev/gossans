@@ -91,6 +91,7 @@ HEAD = """<!doctype html>
       <nav class="topnav">
         <a href="/fit/">Fit a well</a>
         <a href="/basin-model/">Model</a>
+        <a href="/strata/">Strata 3D</a>
         <a href="/powder-river-basin/">Study</a>
         <a href="/findings/">Findings</a>
         <a href="/about/">About</a>
