@@ -978,6 +978,7 @@ def build_pages():
 
     import fitter_page
     import model_page
+    import strata_page
 
     pages.append({
         "url": "/fit/",
@@ -997,6 +998,16 @@ def build_pages():
         "priority": "1.0",
         "body": model_page.BODY,
         "head_extra": model_page.HEAD_EXTRA,
+    })
+
+    pages.append({
+        "url": "/strata/",
+        "title": "%s | Gossans" % strata_page.TITLE,
+        "description": strata_page.DESCRIPTION,
+        "kicker": "Interactive model &middot; 3D",
+        "priority": "1.0",
+        "body": strata_page.BODY,
+        "head_extra": strata_page.HEAD_EXTRA,
     })
 
     pages.append({
