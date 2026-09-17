@@ -48,7 +48,7 @@ PANE = r"""
       <div class="scenewrap">
         <canvas id="scene"></canvas>
         <div id="hud" class="hud">loading&hellip;</div>
-        <div id="legend" class="legend3d"></div>
+        <div id="flabels" class="flabels" aria-hidden="true"></div>
         <div id="compass" class="compass" aria-hidden="true">
           <svg viewBox="-50 -50 100 100">
             <g id="rose">
@@ -65,15 +65,21 @@ PANE = r"""
         </div>
       </div>
       <div class="panel">
-        <h3>Display</h3>
+        <h3>View</h3>
         <div class="ctlgrp" id="ctl"></div>
+        <h3>Layers</h3>
+        <div class="lay3d" id="layers3d"></div>
+        <h3 class="withbtn">Strata
+          <button type="button" id="allstrata">Hide all</button></h3>
+        <div id="legend" class="legend3d"></div>
         <p class="orient" id="orient"></p>
         <p class="zoomhint">
           Drag to rotate, scroll to zoom, hold shift to pan. Each mark is a
           formation top at the depth an operator filed for it; each line is a
           wellbore, following its filed survey where one exists and vertical
           where none does. The ground is the USGS bare-earth elevation model
-          on a 400&nbsp;m grid, with the township lines laid on it.
+          on a 400&nbsp;m grid, with the township lines laid on it. Every
+          switch that changes what is drawn is in the legend below.
         </p>
       </div>
     </div>
@@ -108,6 +114,19 @@ NOTES = r"""
         support. And the surveyed paths are thinned before they reach your
         browser, so a path is the shape of the filed survey rather than every
         station in it.
+      </p>
+      <p>
+        A formation in the legend governs two things at once: the tops filed
+        at that horizon, and the wells completed in it. They are the same
+        subject seen twice - what a well passed through and what it was
+        perforated in - and having them on separate switches meant a layer
+        could be turned off while the wells producing from it stayed on the
+        screen. Completions come from the filed producing intervals: 2,410
+        wells are matched to a formation drawn here, 100 have no producing
+        formation on file, and 38 produce from something this view does not
+        draw because too few tops were filed for it. The last two groups are
+        not folded in with the rest; they have their own row, so no switch
+        claims to control more than it does.
       </p>
       <p>
         The ground surface is the one surface here that is not an inference.
@@ -192,14 +211,33 @@ STYLE = r"""
 .hud { position: absolute; left: 12px; top: 12px; font-family: var(--f-data);
   font-size: 11px; line-height: 1.6; color: var(--ink-2); background: var(--paper);
   border: 1px solid var(--rule); padding: 8px 10px; max-width: 46ch; }
-.legend3d { position: absolute; right: 12px; top: 12px; bottom: 12px; overflow-y: auto;
-  font-family: var(--f-data); font-size: 11px; background: var(--paper);
-  border: 1px solid var(--rule); padding: 8px 10px; min-width: 20ch; }
-.legend3d button { display: flex; align-items: center; gap: 7px; width: 100%;
-  background: none; border: 0; padding: 2px 0; font: inherit; color: var(--ink-2);
+/* The legend sits in the panel with every other switch rather than floating
+   over the scene, because a legend that covers only half the layers is not a
+   legend. */
+.legend3d { font-family: var(--f-data); font-size: 11px; max-height: 240px;
+  overflow-y: auto; }
+.legend3d button { display: flex; align-items: flex-start; gap: 7px; width: 100%;
+  background: none; border: 0; padding: 3px 0; font: inherit; color: var(--ink-2);
   cursor: pointer; text-align: left; }
 .legend3d button[aria-pressed="false"] { opacity: .35; }
-.legend3d .sw { width: 11px; height: 11px; flex: none; }
+.legend3d .sw { width: 11px; height: 11px; flex: none; margin-top: 3px; }
+.panel h3.withbtn { display: flex; align-items: baseline; justify-content: space-between; }
+.panel h3.withbtn button { font-family: var(--f-data); font-size: 9.5px;
+  letter-spacing: .1em; text-transform: uppercase; background: none;
+  border: 1px solid var(--rule); color: var(--ink-2); cursor: pointer;
+  padding: 2px 6px; }
+.panel h3.withbtn button:hover { border-color: var(--redline); color: var(--ink); }
+.lay3d label { display: flex; align-items: center; gap: 7px; padding: 2px 0;
+  cursor: pointer; font-family: var(--f-data); font-size: 11.5px; }
+.lay3d input { flex: none; }
+/* Formation names drawn over the scene. Each sits at the middle of its own
+   tops, so where a layer is not drawn there is no name for it either. */
+.flabels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.flabel { position: absolute; transform: translate(-50%, -50%);
+  font-family: var(--f-data); font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); padding: 1px 5px; white-space: nowrap;
+  display: none; }
 .legend3d .n { margin-left: auto; color: var(--ink-3); padding-left: 8px; }
 .legend3d .d { display: block; font-style: normal; color: var(--ink-3); font-size: 10px; }
 .legend3d h4 { font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
@@ -217,7 +255,8 @@ function gossansStrata() {
   if (!window.THREE) { fail("The 3D library did not load, so this view cannot draw."); return; }
 
   var EXAG = 15, showPaths = true, onlySurveyed = false, showSurfaces = false;
-  var showGround = true, showGrid = true;
+  var showGround = true, showGrid = true, showLabels = true;
+  var hiddenNone = false, labels = [];
   var data = null, surf = null, terr = null, plss = null, hidden = {};
   var renderer, scene, camera, root, tops = [], lines = [], meshes = [];
   var ground = null, gridLines = null;
@@ -249,50 +288,66 @@ function gossansStrata() {
   });
 
   function controls() {
+    // What is in the scene is one list, in the legend. What is done to the
+    // whole scene - how far it is stretched, which wells are in it at all,
+    // where the camera sits - is here.
     ctl.innerHTML =
       '<label class="ctl">Vertical exaggeration <input id="ex" type="range" min="1" max="40" step="1" value="' + EXAG + '"> <b id="exv">' + EXAG + '&times;</b></label>' +
-      '<label class="ctl"><input id="cp" type="checkbox" checked> Wellbores</label>' +
       '<label class="ctl"><input id="cs" type="checkbox"> Only wells with a survey</label>' +
-      '<label class="ctl"><input id="cf" type="checkbox"> Interpolated surfaces</label>' +
-      '<label class="ctl"><input id="cg" type="checkbox" checked> Ground surface</label>' +
-      '<label class="ctl"><input id="ck" type="checkbox" checked> Township grid</label>' +
-      '<button class="ctl" id="allstrata" type="button">Hide all strata</button>' +
       '<button class="ctl" id="reset" type="button">Reset view</button>';
+    layers();
     document.getElementById("ex").addEventListener("input", function (e) {
       EXAG = +e.target.value;
       document.getElementById("exv").innerHTML = EXAG + "&times;";
       applyScale();
     });
-    document.getElementById("cp").addEventListener("change", function (e) {
-      showPaths = e.target.checked; applyVisible();
-    });
     document.getElementById("cs").addEventListener("change", function (e) {
       onlySurveyed = e.target.checked; rebuild();
-    });
-    document.getElementById("cf").addEventListener("change", function (e) {
-      showSurfaces = e.target.checked;
-      applyVisible();
-      hud.innerHTML = showSurfaces
-        ? "Surfaces are <b>interpolated</b>: a weighted average of nearby filed "
-          + "tops, not measurements. They stop where well control does."
-        : "Measured tops and wellbores only. Nothing is drawn between wells.";
-    });
-    document.getElementById("cg").addEventListener("change", function (e) {
-      showGround = e.target.checked; applyVisible();
-    });
-    document.getElementById("ck").addEventListener("change", function (e) {
-      showGrid = e.target.checked; applyVisible();
     });
     document.getElementById("allstrata").addEventListener("click", function () {
       // Hiding every formation leaves the wellbores, which is the useful
       // state: the holes on their own, with nothing draped on them.
       var anyShown = data.formations.some(function (f, i) { return !hidden[i]; });
       data.formations.forEach(function (f, i) { hidden[i] = anyShown; });
-      this.textContent = anyShown ? "Show all strata" : "Hide all strata";
+      this.textContent = anyShown ? "Show all" : "Hide all";
       drawLegend();
       applyVisible();
     });
     document.getElementById("reset").addEventListener("click", home);
+  }
+
+  //: every layer in the scene, with the flag it sets and what it is called.
+  var LAYERS = [
+    {id: "cg", label: "Ground surface", get: function () { return showGround; },
+     set: function (v) { showGround = v; }},
+    {id: "ck", label: "Township grid", get: function () { return showGrid; },
+     set: function (v) { showGrid = v; }},
+    {id: "cp", label: "Wellbores", get: function () { return showPaths; },
+     set: function (v) { showPaths = v; }},
+    {id: "cl", label: "Formation labels", get: function () { return showLabels; },
+     set: function (v) { showLabels = v; }},
+    {id: "cf", label: "Interpolated surfaces", get: function () { return showSurfaces; },
+     set: function (v) { showSurfaces = v; }}
+  ];
+
+  function layers() {
+    var box = document.getElementById("layers3d");
+    if (!box) return;
+    box.innerHTML = LAYERS.map(function (L) {
+      return '<label><input id="' + L.id + '" type="checkbox"' +
+             (L.get() ? " checked" : "") + "> " + L.label + "</label>";
+    }).join("");
+    LAYERS.forEach(function (L) {
+      document.getElementById(L.id).addEventListener("change", function (e) {
+        L.set(e.target.checked);
+        if (L.id === "cf")
+          hud.innerHTML = showSurfaces
+            ? "Surfaces are <b>interpolated</b>: a weighted average of nearby filed "
+              + "tops, not measurements. They stop where well control does."
+            : "Measured tops and wellbores only. Nothing is drawn between wells.";
+        applyVisible();
+      });
+    });
   }
 
   function build() {
@@ -312,7 +367,10 @@ function gossansStrata() {
     window.gossansViews = window.gossansViews || {};
     window.gossansViews.resize3d = function(){ resize(); home(); };
     bindCamera();
-    renderer.setAnimationLoop(function () { renderer.render(scene, camera); });
+    renderer.setAnimationLoop(function () {
+      renderer.render(scene, camera);
+      placeLabels();
+    });
 
     var c = data.counts;
     document.getElementById("nsurv").textContent = c.not_surveyed.toLocaleString();
@@ -324,6 +382,12 @@ function gossansStrata() {
       c.survey_stations_dropped_by_thinning.toLocaleString() + " stations. " +
       c.tops_dropped_rare_formation.toLocaleString() +
       " tops in formations with fewer than 25 records are not shown.";
+  }
+
+  function mid(a) {
+    if (!a.length) return 0;
+    var b = a.slice().sort(function (p, q) { return p - q; });
+    return b[Math.floor(b.length / 2)];
   }
 
   function rebuild() {
@@ -348,13 +412,28 @@ function gossansStrata() {
       var m = new THREE.PointsMaterial({ color: f.colour, size: 3.5,
                                          sizeAttenuation: false });
       var p = new THREE.Points(g, m);
-      p.userData = { formation: fi };
+      // The middle of this formation's own tops, which is where its name is
+      // written when labels are on.
+      var xs = [], ys = [], zs = [];
+      for (var q = 0; q < pts.length; q += 3) {
+        xs.push(pts[q]); ys.push(pts[q + 1]); zs.push(pts[q + 2]);
+      }
+      p.userData = { formation: fi, anchor: [mid(xs), mid(ys), mid(zs)] };
       tops.push(p); root.add(p);
     });
 
-    // Wellbores: the filed survey where there is one, otherwise vertical.
-    var surveyed = [], vertical = [];
+    // Wellbores, grouped by the formation each well was completed in, so a
+    // formation switched off in the legend takes its producers with it. The
+    // key is that formation's index, or "none" for a well completed in
+    // something this view does not draw or with nothing on file at all.
+    var byProd = {};
+    function bucket(w) {
+      var k = (w.prod && w.prod.length) ? w.prod[0] : "none";
+      if (!byProd[k]) byProd[k] = { surveyed: [], vertical: [] };
+      return byProd[k];
+    }
     wells.forEach(function (w) {
+      var surveyed = bucket(w).surveyed, vertical = bucket(w).vertical;
       if (w.surveyed && w.path) {
         for (var i = 1; i < w.path.length; i++) {
           surveyed.push(w.path[i - 1][0], w.path[i - 1][1], w.path[i - 1][2]);
@@ -377,12 +456,18 @@ function gossansStrata() {
         vertical.push(w.x, w.y, top, w.x, w.y, bot);
       }
     });
-    [[surveyed, "#54606b", 1], [vertical, "#8a9098", 1]].forEach(function (pair) {
+    var pairs = [];
+    Object.keys(byProd).forEach(function (k) {
+      pairs.push([byProd[k].surveyed, "#54606b", k]);
+      pairs.push([byProd[k].vertical, "#8a9098", k]);
+    });
+    pairs.forEach(function (pair) {
       if (!pair[0].length) return;
       var g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.Float32BufferAttribute(pair[0], 3));
       var l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
         color: pair[1], transparent: true, opacity: 0.7 }));
+      l.userData = { prod: pair[2] };
       lines.push(l); root.add(l);
     });
 
@@ -596,25 +681,90 @@ function gossansStrata() {
   }
 
   function drawLegend() {
-    legend.innerHTML = "<h4>Median depth &middot; picks</h4>";
-    data.formations.forEach(function (f, i) {
+    legend.innerHTML = "";
+    var noneWells = data.wells.filter(function (w) {
+      return !(w.prod && w.prod.length); }).length;
+
+    function row(colour, name, sub, on, toggle) {
       var b = document.createElement("button");
       b.type = "button";
-      b.setAttribute("aria-pressed", hidden[i] ? "false" : "true");
-      // The median depth and the number of picks behind it were a separate
-      // diagram on this page. They belong on the thing that draws the tops.
-      var d = (f.median_depth_ft === undefined || f.median_depth_ft === null)
-        ? "" : f.median_depth_ft.toLocaleString() + " ft";
-      b.innerHTML = '<span class="sw" style="background:' + f.colour + '"></span>' +
-                    '<span>' + f.name + '<i class="d">' + d + '</i></span>' +
-                    '<span class="n">' + f.tops + '</span>';
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      b.innerHTML = '<span class="sw" style="background:' + colour + '"></span>' +
+                    '<span>' + name + '<i class="d">' + sub + '</i></span>';
       b.addEventListener("click", function () {
-        hidden[i] = !hidden[i];
-        b.setAttribute("aria-pressed", hidden[i] ? "false" : "true");
+        var nowOn = toggle();
+        b.setAttribute("aria-pressed", nowOn ? "true" : "false");
         syncAllButton();
         applyVisible();
       });
       legend.appendChild(b);
+    }
+
+    data.formations.forEach(function (f, i) {
+      // Depth and picks were a separate diagram once. The well count is what
+      // the row also governs: switching it off takes the tops at that horizon
+      // and the wells completed in it together.
+      var sub = (f.median_depth_ft === undefined || f.median_depth_ft === null
+                 ? "" : f.median_depth_ft.toLocaleString() + " ft &middot; ") +
+                f.tops.toLocaleString() + " tops" +
+                (f.wells ? " &middot; " + f.wells.toLocaleString() + " producing" : "");
+      row(f.colour, f.name, sub, !hidden[i], function () {
+        hidden[i] = !hidden[i];
+        return !hidden[i];
+      });
+    });
+
+    if (noneWells) {
+      row("#8a9098", "No producing formation filed",
+          noneWells.toLocaleString() + " wells", !hiddenNone, function () {
+            hiddenNone = !hiddenNone;
+            return !hiddenNone;
+          });
+    }
+    buildLabels();
+  }
+
+  // ------------------------------------------------------------- labels
+  // A name written at the middle of each formation's own tops. Drawn in the
+  // page rather than the scene, and dropped when it would land on a name
+  // already written, so the view thins out its own labels as it zooms out.
+  function buildLabels() {
+    var box = document.getElementById("flabels");
+    if (!box) return;
+    box.innerHTML = "";
+    labels = [];
+    tops.forEach(function (p) {
+      var f = data.formations[p.userData.formation];
+      if (!f || !p.userData.anchor) return;
+      var el = document.createElement("div");
+      el.className = "flabel";
+      el.textContent = f.name;
+      box.appendChild(el);
+      labels.push({ el: el, f: p.userData.formation, a: p.userData.anchor });
+    });
+  }
+
+  function placeLabels() {
+    if (!labels.length || !camera) return;
+    var w = host.clientWidth, h = host.clientHeight, taken = [];
+    var v = new THREE.Vector3();
+    labels.forEach(function (L) {
+      if (!showLabels || hidden[L.f]) { L.el.style.display = "none"; return; }
+      v.set(L.a[0], L.a[1], L.a[2] * EXAG).project(camera);
+      if (v.z > 1) { L.el.style.display = "none"; return; }
+      var x = (v.x * 0.5 + 0.5) * w, y = (-v.y * 0.5 + 0.5) * h;
+      if (x < 30 || y < 10 || x > w - 30 || y > h - 10) {
+        L.el.style.display = "none"; return;
+      }
+      for (var i = 0; i < taken.length; i++) {
+        if (Math.abs(taken[i][0] - x) < 80 && Math.abs(taken[i][1] - y) < 15) {
+          L.el.style.display = "none"; return;
+        }
+      }
+      taken.push([x, y]);
+      L.el.style.display = "block";
+      L.el.style.left = x + "px";
+      L.el.style.top = y + "px";
     });
   }
 
@@ -622,7 +772,7 @@ function gossansStrata() {
     var btn = document.getElementById("allstrata");
     if (!btn) return;
     var anyShown = data.formations.some(function (f, i) { return !hidden[i]; });
-    btn.textContent = anyShown ? "Hide all strata" : "Show all strata";
+    btn.textContent = anyShown ? "Hide all" : "Show all";
   }
 
   function applyScale() { root.scale.set(1, 1, EXAG); }
@@ -631,7 +781,10 @@ function gossansStrata() {
     if (ground) ground.visible = showGround;
     if (gridLines) gridLines.visible = showGrid;
     tops.forEach(function (p) { p.visible = !hidden[p.userData.formation]; });
-    lines.forEach(function (l) { l.visible = showPaths; });
+    lines.forEach(function (l) {
+      var k = l.userData.prod;
+      l.visible = showPaths && !(k === "none" ? hiddenNone : hidden[k]);
+    });
     meshes.forEach(function (m) {
       var i = data.formations.findIndex(function (f) { return f.name === m.userData.name; });
       m.visible = showSurfaces && !hidden[i];
