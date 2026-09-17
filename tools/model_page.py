@@ -328,6 +328,16 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
   // Townships come as one file. Sections and quarter-quarters are per
   // township, fetched as the map moves, because all of them at once is 42 MB
   // of grid nobody can read until they have zoomed in.
+  // The township polygons are a megabyte and both views on this page want
+  // them. One fetch, shared, rather than one each.
+  function townshipsGeoJSON(){
+    var g = window.gossansData = window.gossansData || {};
+    if (!g.townships)
+      g.townships = fetch("/data/plss_townships.geojson")
+        .then(function(r){ return r.ok ? r.json() : null; });
+    return g.townships;
+  }
+
   function cadastral(map){
     var loaded = {}, groups = {
       model: L.layerGroup(),
@@ -348,8 +358,8 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       cellBy[c.twp + "N " + c.rge + "W"] = c;
     });
 
-    fetch("/data/plss_townships.geojson").then(function(r){return r.json();})
-      .then(function(g){
+    townshipsGeoJSON().then(function(g){
+        if (!g) return;
         L.geoJSON(g, {style: style.twp, onEachFeature: function(f, l){
           l.bindTooltip(f.properties.label,
             {permanent:true, direction:"center", className:"plsslab twp"});

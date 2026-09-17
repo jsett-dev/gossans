@@ -969,7 +969,8 @@ header.plate { padding: 40px 0 0; }
           Drag to rotate, scroll to zoom, hold shift to pan. Each mark is a
           formation top at the depth an operator filed for it; each line is a
           wellbore, following its filed survey where one exists and vertical
-          where none does.
+          where none does. The ground is the USGS bare-earth elevation model
+          on a 400&nbsp;m grid, with the township lines laid on it.
         </p>
       </div>
     </div>
@@ -1211,6 +1212,16 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
   // Townships come as one file. Sections and quarter-quarters are per
   // township, fetched as the map moves, because all of them at once is 42 MB
   // of grid nobody can read until they have zoomed in.
+  // The township polygons are a megabyte and both views on this page want
+  // them. One fetch, shared, rather than one each.
+  function townshipsGeoJSON(){
+    var g = window.gossansData = window.gossansData || {};
+    if (!g.townships)
+      g.townships = fetch("/data/plss_townships.geojson")
+        .then(function(r){ return r.ok ? r.json() : null; });
+    return g.townships;
+  }
+
   function cadastral(map){
     var loaded = {}, groups = {
       model: L.layerGroup(),
@@ -1231,8 +1242,8 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       cellBy[c.twp + "N " + c.rge + "W"] = c;
     });
 
-    fetch("/data/plss_townships.geojson").then(function(r){return r.json();})
-      .then(function(g){
+    townshipsGeoJSON().then(function(g){
+        if (!g) return;
         L.geoJSON(g, {style: style.twp, onEachFeature: function(f, l){
           l.bindTooltip(f.properties.label,
             {permanent:true, direction:"center", className:"plsslab twp"});
@@ -1528,6 +1539,29 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
         station in it.
       </p>
       <p>
+        The ground surface is the one surface here that is not an inference.
+        It is the U.S. Geological Survey's bare-earth elevation model, built
+        largely from airborne lidar and served at one metre, resampled onto a
+        400&nbsp;m grid because what it is wanted for is a datum under a
+        column of formation tops rather than a terrain analysis. Bare earth
+        means the ground, not the trees or the buildings on it, and anything
+        needing the real resolution should go to
+        <a href="https://www.usgs.gov/3d-elevation-program">3DEP</a> rather
+        than to this page. Compared against the elevations operators filed
+        with their own formation tops, on 400 wells, the filed figure sits a
+        median 14&nbsp;m above this grid, which is about what a kelly bushing
+        height plus a 400&nbsp;m average of the ground should look like.
+      </p>
+      <p>
+        The township lines on that surface are the Bureau of Land Management's
+        survey grid, draped by sampling the ground under each step along the
+        line. In BLM's words these data are neither legal documents nor land
+        surveys and must not be used as such, and putting them on a
+        three-dimensional ground makes them look more like a boundary than
+        ever, so it bears repeating: this is the survey grid drawn for
+        reference, not a determination of anybody's corner.
+      </p>
+      <p>
         Vertical exaggeration is on by default because the basin is about a
         hundred kilometres across and a couple of kilometres deep, and at true
         scale the layers collapse into a line. Exaggeration distorts dip and
@@ -1575,8 +1609,10 @@ function gossansStrata() {
   if (!window.THREE) { fail("The 3D library did not load, so this view cannot draw."); return; }
 
   var EXAG = 15, showPaths = true, onlySurveyed = false, showSurfaces = false;
-  var data = null, surf = null, hidden = {};
+  var showGround = true, showGrid = true;
+  var data = null, surf = null, terr = null, plss = null, hidden = {};
   var renderer, scene, camera, root, tops = [], lines = [], meshes = [];
+  var ground = null, gridLines = null;
 
   Promise.all([
     fetch("/data/strata.json").then(function (r) {
@@ -1584,9 +1620,22 @@ function gossansStrata() {
     // The surfaces are optional. If they fail to load the measured view still
     // works, which is the right way round for a layer that is inference.
     fetch("/data/surfaces.json").then(function (r) {
-      return r.ok ? r.json() : null; }).catch(function () { return null; })
+      return r.ok ? r.json() : null; }).catch(function () { return null; }),
+    // The ground and the survey grid are both optional in the same way: if
+    // either fails the measured view still stands, which is the right way
+    // round for context around the measurements.
+    fetch("/data/terrain.json").then(function (r) {
+      return r.ok ? r.json() : null; }).catch(function () { return null; }),
+    (function () {
+      // Shared with the map on the same page, which wants the same megabyte.
+      var g = window.gossansData = window.gossansData || {};
+      if (!g.townships)
+        g.townships = fetch("/data/plss_townships.geojson")
+          .then(function (r) { return r.ok ? r.json() : null; });
+      return g.townships.catch(function () { return null; });
+    })()
   ]).then(function (both) {
-    data = both[0]; surf = both[1]; build();
+    data = both[0]; surf = both[1]; terr = both[2]; plss = both[3]; build();
   }).catch(function () {
     fail("Could not load the strata data.");
   });
@@ -1597,6 +1646,8 @@ function gossansStrata() {
       '<label class="ctl"><input id="cp" type="checkbox" checked> Wellbores</label>' +
       '<label class="ctl"><input id="cs" type="checkbox"> Only wells with a survey</label>' +
       '<label class="ctl"><input id="cf" type="checkbox"> Interpolated surfaces</label>' +
+      '<label class="ctl"><input id="cg" type="checkbox" checked> Ground surface</label>' +
+      '<label class="ctl"><input id="ck" type="checkbox" checked> Township grid</label>' +
       '<button class="ctl" id="allstrata" type="button">Hide all strata</button>' +
       '<button class="ctl" id="reset" type="button">Reset view</button>';
     document.getElementById("ex").addEventListener("input", function (e) {
@@ -1617,6 +1668,12 @@ function gossansStrata() {
         ? "Surfaces are <b>interpolated</b>: a weighted average of nearby filed "
           + "tops, not measurements. They stop where well control does."
         : "Measured tops and wellbores only. Nothing is drawn between wells.";
+    });
+    document.getElementById("cg").addEventListener("change", function (e) {
+      showGround = e.target.checked; applyVisible();
+    });
+    document.getElementById("ck").addEventListener("change", function (e) {
+      showGrid = e.target.checked; applyVisible();
     });
     document.getElementById("allstrata").addEventListener("click", function () {
       // Hiding every formation leaves the wellbores, which is the useful
@@ -1712,6 +1769,11 @@ function gossansStrata() {
     });
 
     buildSurfaces();
+    // The ground and the grid cost real time to build and do not depend on
+    // any of the switches that cause a rebuild, so they are built once and
+    // put back afterwards.
+    if (ground) root.add(ground); else buildGround();
+    if (gridLines) root.add(gridLines); else buildGrid();
     drawLegend();
     applyScale();
     applyVisible();
@@ -1722,6 +1784,157 @@ function gossansStrata() {
   // the edge of well control instead of tapering into ground nobody drilled.
   // Colour is mixed toward the page background as the nearest control point
   // gets further away, so thin support looks thin.
+  // ---------------------------------------------------------------- ground
+  // Scene metres from the strata origin, which is where every other object in
+  // this view is placed from.
+  function metres() {
+    return { lat: 111132.0,
+             lon: 111320.0 * Math.cos(data.origin.lat * Math.PI / 180) };
+  }
+
+  function terrainAt(x, y) {
+    if (!terr) return null;
+    var m = metres();
+    var lon = data.origin.lon + x / m.lon, lat = data.origin.lat + y / m.lat;
+    var fx = (lon - terr.min_lon) / terr.step_lon - 0.5;
+    var fy = (lat - terr.min_lat) / terr.step_lat - 0.5;
+    var ix = Math.floor(fx), iy = Math.floor(fy);
+    if (ix < 0 || iy < 0 || ix >= terr.nx - 1 || iy >= terr.ny - 1) return null;
+    var tx = fx - ix, ty = fy - iy;
+    var a = terr.z[iy * terr.nx + ix], b = terr.z[iy * terr.nx + ix + 1],
+        c = terr.z[(iy + 1) * terr.nx + ix], d = terr.z[(iy + 1) * terr.nx + ix + 1];
+    if (a === null || b === null || c === null || d === null) return null;
+    return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
+  }
+
+  function buildGround() {
+    if (!terr) return;
+    var nx = terr.nx, ny = terr.ny, m = metres();
+    var pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3);
+    var lo = Infinity, hi = -Infinity, i, j, k;
+    for (i = 0; i < terr.z.length; i++) {
+      var v = terr.z[i];
+      if (v === null) continue;
+      if (v < lo) lo = v;
+      if (v > hi) hi = v;
+    }
+    for (j = 0; j < ny; j++) {
+      for (i = 0; i < nx; i++) {
+        k = j * nx + i;
+        var lon = terr.min_lon + (i + 0.5) * terr.step_lon;
+        var lat = terr.min_lat + (j + 0.5) * terr.step_lat;
+        var z = terr.z[k];
+        pos[k * 3] = (lon - data.origin.lon) * m.lon;
+        pos[k * 3 + 1] = (lat - data.origin.lat) * m.lat;
+        pos[k * 3 + 2] = (z === null ? lo : z);
+      }
+    }
+    // No lights in this scene, so the relief is shaded here: a slope term from
+    // the neighbouring cells, lit from the north-west the way a map is.
+    for (j = 0; j < ny; j++) {
+      for (i = 0; i < nx; i++) {
+        k = j * nx + i;
+        var xw = pos[(j * nx + Math.max(0, i - 1)) * 3 + 2];
+        var xe = pos[(j * nx + Math.min(nx - 1, i + 1)) * 3 + 2];
+        var ys = pos[(Math.max(0, j - 1) * nx + i) * 3 + 2];
+        var yn = pos[(Math.min(ny - 1, j + 1) * nx + i) * 3 + 2];
+        var d = terr.step_m * 2;
+        var nxv = -(xe - xw) / d, nyv = -(yn - ys) / d, nz = 1;
+        var len = Math.sqrt(nxv * nxv + nyv * nyv + nz * nz);
+        var lit = (nxv * -0.55 + nyv * 0.55 + nz * 0.63) / len;
+        var shade = 0.55 + 0.45 * Math.max(0, lit);
+        var t = (hi === lo) ? 0.5 : (pos[k * 3 + 2] - lo) / (hi - lo);
+        // Sandstone in the low ground, slate on the high, both muted so the
+        // measurements stay the brightest thing on the screen.
+        col[k * 3]     = (0.85 - 0.30 * t) * shade;
+        col[k * 3 + 1] = (0.77 - 0.24 * t) * shade;
+        col[k * 3 + 2] = (0.63 - 0.06 * t) * shade;
+      }
+    }
+    var idx = new Uint32Array((nx - 1) * (ny - 1) * 6), p = 0;
+    for (j = 0; j < ny - 1; j++) {
+      for (i = 0; i < nx - 1; i++) {
+        var a = j * nx + i, b = a + 1, c = a + nx, d2 = c + 1;
+        idx[p++] = a; idx[p++] = c; idx[p++] = b;
+        idx[p++] = b; idx[p++] = c; idx[p++] = d2;
+      }
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    ground = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+      vertexColors: true, side: THREE.DoubleSide,
+      transparent: true, opacity: 0.72, depthWrite: false }));
+    ground.renderOrder = -1;
+    root.add(ground);
+  }
+
+  // The survey grid, laid on the ground rather than floating over it. Each
+  // township edge is walked in steps so it follows the terrain it crosses.
+  function buildGrid() {
+    if (!plss || !terr) return;
+    var m = metres(), pts = [], STEP = 600;
+    function push(lon1, lat1, lon2, lat2) {
+      var x1 = (lon1 - data.origin.lon) * m.lon, y1 = (lat1 - data.origin.lat) * m.lat;
+      var x2 = (lon2 - data.origin.lon) * m.lon, y2 = (lat2 - data.origin.lat) * m.lat;
+      var len = Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+      var n = Math.max(1, Math.ceil(len / STEP)), prev = null;
+      for (var i = 0; i <= n; i++) {
+        var t = i / n, x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
+        var z = terrainAt(x, y);
+        if (z === null) { prev = null; continue; }
+        var cur = [x, y, z + 25];
+        if (prev) pts.push(prev[0], prev[1], prev[2], cur[0], cur[1], cur[2]);
+        prev = cur;
+      }
+    }
+    (plss.features || []).forEach(function (f) {
+      var geom = f.geometry;
+      if (!geom) return;
+      var polys = geom.type === "Polygon" ? [geom.coordinates] : geom.coordinates;
+      polys.forEach(function (rings) {
+        rings.forEach(function (ring) {
+          for (var i = 1; i < ring.length; i++)
+            push(ring[i - 1][0], ring[i - 1][1], ring[i][0], ring[i][1]);
+        });
+      });
+    });
+    if (!pts.length) return;
+    var g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));
+    gridLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+      color: 0x54606b, transparent: true, opacity: 0.55 }));
+    root.add(gridLines);
+  }
+
+  // Which township the view is centred over, from the same polygons.
+  function townshipAt(x, y) {
+    if (!plss) return null;
+    var m = metres();
+    var lon = data.origin.lon + x / m.lon, lat = data.origin.lat + y / m.lat;
+    var feats = plss.features || [];
+    for (var f = 0; f < feats.length; f++) {
+      var geom = feats[f].geometry;
+      if (!geom) continue;
+      var polys = geom.type === "Polygon" ? [geom.coordinates] : geom.coordinates;
+      for (var p = 0; p < polys.length; p++) {
+        if (inRing(polys[p][0], lon, lat)) return feats[f].properties.label;
+      }
+    }
+    return null;
+  }
+
+  function inRing(ring, x, y) {
+    var inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+      if ((yi > y) !== (yj > y) &&
+          x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+
   function buildSurfaces() {
     meshes = [];
     if (!surf) return;
@@ -1797,6 +2010,8 @@ function gossansStrata() {
   function applyScale() { root.scale.set(1, 1, EXAG); }
 
   function applyVisible() {
+    if (ground) ground.visible = showGround;
+    if (gridLines) gridLines.visible = showGrid;
     tops.forEach(function (p) { p.visible = !hidden[p.userData.formation]; });
     lines.forEach(function (l) { l.visible = showPaths; });
     meshes.forEach(function (m) {
@@ -1859,7 +2074,9 @@ function gossansStrata() {
     var mlat = 111132.0, mlon = 111320.0 * Math.cos(data.origin.lat * Math.PI / 180);
     var lat = data.origin.lat + target.y / mlat,
         lon = data.origin.lon + target.x / mlon;
-    el.innerHTML = "Centre " + lat.toFixed(4) + "&deg;N " + Math.abs(lon).toFixed(4) + "&deg;W";
+    var twp = townshipAt(target.x, target.y);
+    el.innerHTML = "Centre " + (twp ? "<b>" + twp + "</b> &middot; " : "") +
+      lat.toFixed(4) + "&deg;N " + Math.abs(lon).toFixed(4) + "&deg;W";
   }
   function home() {
     var box = new THREE.Box3().setFromObject(root);
