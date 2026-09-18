@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """The studies index.
 
-One study so far. An index of one looks thin, and it is: pretending otherwise
-by padding it with the findings articles would blur the distinction this page
-exists to draw. A study rebuilds a population from the filings and reports what
-it finds. A finding is a way models go wrong, argued from that work.
+The written study, and the studies the pipeline rebuilds from the store on
+every export (tools/study_pages.py renders those). A study rebuilds a
+population from the filings and reports what it finds. A finding is a way
+models go wrong, argued from that work.
 """
 
 TITLE = "Studies"
@@ -22,9 +22,8 @@ BODY = r"""
     <p class="standfirst">
       A study here means every well that met the criteria, rebuilt from the
       state's own filings, with the wells that did not fit reported rather than
-      dropped. There is one so far. There will not be many, because each takes
-      weeks and the ones worth publishing are the ones that changed somebody's
-      mind.
+      dropped. One was written by hand over weeks. The rest are rebuilt by the
+      pipeline every time the store is, and say so.
     </p>
   </section>
 
@@ -49,21 +48,32 @@ BODY = r"""
   </div>
 
   <div class="block">
+    <div class="rail"><b>Rebuilt</b><span>With every export</span></div>
+    <div class="col">
+<!--REBUILT-->
+      <div class="prose">
+        <p>
+          These are written by the pipeline, not by hand. Each time the store
+          is rebuilt the study runs again over the whole population, and the
+          page shows the numbers it produced that day, with its method and
+          the things it cannot show. They are reporting work rather than
+          opinion, which is the only kind this site publishes while the
+          licensing questions are open. The <a href="/data/">data page</a>
+          says what stands behind them and where the coverage runs out.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="block">
     <div class="rail"><b>Next</b><span>Not yet written</span></div>
     <div class="col prose">
       <p>
-        Two are possible now that the data supports them, and neither is
-        written. How much of a horizontal lateral actually lies under a given
+        How much of a horizontal lateral actually lies under a given
         section, computed from the filed surveys rather than taken from a
         division order. And what the record says about wells completed lightly
         beside neighbours completed four or five times harder, which the
         section screen can already find.
-      </p>
-      <p>
-        Both are reporting work rather than opinion, which is the only kind
-        this site publishes while the licensing questions are open. The
-        <a href="/data/">data page</a> says what stands behind them and where
-        the coverage runs out.
       </p>
     </div>
   </div>

@@ -1032,14 +1032,18 @@ def build_pages():
         "body": data_page.BODY,
     })
 
+    import study_pages
     pages.append({
         "url": "/studies/",
         "title": "%s | Gossans" % studies_page.TITLE,
         "description": studies_page.DESCRIPTION,
         "kicker": "Studies",
         "priority": "0.9",
-        "body": studies_page.BODY,
+        "body": studies_page.BODY.replace("<!--REBUILT-->", study_pages.index_rows()),
     })
+    for page in study_pages.pages():
+        page["head_extra"] = study_pages.HEAD_EXTRA
+        pages.append(page)
 
     pages.append({
         "url": "/powder-river-basin/",
