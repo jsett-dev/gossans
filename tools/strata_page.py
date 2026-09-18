@@ -1076,11 +1076,11 @@ function gossansStrata() {
         var g2 = 0.72 + 0.28 * Math.max(0, lit);
         grey[k * 3] = grey[k * 3 + 1] = grey[k * 3 + 2] = g2;
       }
-      // Skirts: the edge ring again, dropped, so neighbouring tiles at a
-      // different level do not show a crack of sky between them. Three
-      // percent of the tile's width: a shallower skirt lets slivers of sky
-      // through from beneath where a coarse neighbour is not yet stitched.
-      var drop = Math.max(3, t.size * 0.03), sk = N * N, edges = [];
+      // Skirts: the edge ring again, dropped a hair, so a corner pinhole
+      // or a tile still arriving does not show sky. Edges are stitched to
+      // the neighbour's own heights, so the skirt is a skin, not a slab:
+      // the ground has geology beneath it and nothing may hang into it.
+      var drop = Math.max(0.3, t.size * 0.0005), sk = N * N, edges = [];
       for (i = 0; i < N; i++) edges.push(i);                       // south row
       for (j = 0; j < N; j++) edges.push(j * N + N - 1);           // east column
       for (i = N - 1; i >= 0; i--) edges.push((N - 1) * N + i);    // north row
@@ -1107,9 +1107,9 @@ function gossansStrata() {
       g.userData = { ramp: new THREE.BufferAttribute(ramp, 3), grey: new THREE.BufferAttribute(grey, 3), uv0: uv };
       g.setAttribute("color", g.userData.ramp);
       // Three faces of one geometry: the top, drawn front-side only; the
-      // same triangles again as the underside, back-side only, one flat
-      // tone with the relief shading, so from beneath the ground is a
-      // surface and not a patchwork of photographs; and the skirts.
+      // same triangles again as the underside, back-side only, in the
+      // relief shading alone, so from beneath the ground is a surface and
+      // not a patchwork of photographs; and the skirts.
       var nSurf = (N - 1) * (N - 1) * 6, nSkirt = skirt * 6;
       g.addGroup(0, nSurf, 0);
       g.addGroup(0, nSurf, 2);
@@ -1117,12 +1117,13 @@ function gossansStrata() {
       var common = { vertexColors: true, transparent: true, opacity: groundOpacity,
                      depthWrite: true, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 };
       var top = new THREE.MeshBasicMaterial(Object.assign({ side: THREE.FrontSide }, common));
-      // The skirts wear the underside's tone rather than the photograph:
-      // seen from beneath they then read as the same surface, not as a
-      // lattice of walls, and from above they only ever show through a
-      // hairline crack.
-      var skirtMat = new THREE.MeshBasicMaterial(Object.assign({ side: THREE.DoubleSide, color: 0x7d7268 }, common));
-      var under = new THREE.MeshBasicMaterial(Object.assign({ side: THREE.BackSide, color: 0x7d7268 }, common));
+      // The underside and the skirts wear the top's own relief shading
+      // without the photograph: the same vertex colours, no map. Seen
+      // through a translucent ground from above the skirt is then the
+      // ground's colour and vanishes; from beneath the ground is one shaded
+      // surface with the skirts as part of it.
+      var skirtMat = new THREE.MeshBasicMaterial(Object.assign({ side: THREE.DoubleSide }, common));
+      var under = new THREE.MeshBasicMaterial(Object.assign({ side: THREE.BackSide }, common));
       var mesh = new THREE.Mesh(g, [top, skirtMat, under]);
       mesh.renderOrder = 0;
       var node = new THREE.Group();
@@ -1368,20 +1369,43 @@ function gossansStrata() {
         var N = TILE_N, sk = N * N;
         Object.keys(sides).forEach(function (side) {
           var nb = visibleLevelAt(t.z, sides[side][0], sides[side][1]);
-          var kdiff = nb === null ? 0 : Math.max(0, Math.min(6, t.z - nb));
-          var idx = edgeIndices(side), step = 1 << kdiff;
+          var kdiff = nb === null ? 0 : Math.max(0, t.z - nb);
+          var idx = edgeIndices(side);
+          // The neighbour drawn across this edge, at its own level, and
+          // the row or column of its DEM that lies along the shared edge.
+          var nt = nb === null || nb > t.z ? null
+                 : tiles[key(nb, sides[side][0] >> kdiff, sides[side][1] >> kdiff)];
+          if (nt && !nt.dem) nt = null;
+          // A height on the neighbour's edge at a longitude or latitude of
+          // ours, read from its own samples. Its rows run south to north,
+          // as ours do; the edge it shares with us is the row or column
+          // facing us.
+          function nbAt(i) {
+            var b = t.b, cb = nt.b, u, j0, j1, f, za, zb;
+            if (side === "n" || side === "s") {
+              var lon = b.lon0 + i * (b.lon1 - b.lon0) / (N - 1);
+              u = (lon - cb.lon0) / (cb.lon1 - cb.lon0) * (N - 1);
+            } else {
+              var lat = b.lat0 + i * (b.lat1 - b.lat0) / (N - 1);
+              u = (lat - cb.lat0) / (cb.lat1 - cb.lat0) * (N - 1);
+            }
+            u = Math.max(0, Math.min(N - 1, u));
+            j0 = Math.floor(u); j1 = Math.min(N - 1, j0 + 1); f = u - j0;
+            var row = side === "s" ? (N - 1) : side === "n" ? 0 : null;   // south neighbour: its north row
+            var col = side === "e" ? 0 : side === "w" ? (N - 1) : null;   // east neighbour: its west column
+            if (row !== null) { za = nt.dem[row * N + j0]; zb = nt.dem[row * N + j1]; }
+            else { za = nt.dem[j0 * N + col]; zb = nt.dem[j1 * N + col]; }
+            if (isNaN(za) || isNaN(zb)) return NaN;
+            return za + (zb - za) * f;
+          }
           // Which slot of the skirt ring each edge vertex has: south row
           // first, then east, then north reversed, then west reversed.
           for (var i = 0; i < N; i++) {
-            var vi = idx[i], z;
-            if (kdiff === 0 || i % step === 0) {
-              z = t.dem[vi];
-              if (isNaN(z)) z = t.zmin;
-            } else {
-              var a = idx[i - (i % step)], b = idx[Math.min(N - 1, i - (i % step) + step)];
-              var za = t.dem[a], zb = t.dem[b];
-              if (isNaN(za)) za = t.zmin; if (isNaN(zb)) zb = t.zmin;
-              z = za + (zb - za) * ((i % step) / step);
+            var vi = idx[i], z = t.dem[vi];
+            if (isNaN(z)) z = t.zmin;
+            if (nt) {
+              var zn = nbAt(i);
+              if (!isNaN(zn)) z = kdiff === 0 ? (z + zn) / 2 : zn;
             }
             if (Math.abs(p.getZ(vi) - z) > 1e-3) {
               p.setZ(vi, z);
