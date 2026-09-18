@@ -74,6 +74,7 @@ HEAD = """<!doctype html>
 
 {fonts}
 
+<script>var DATA = window.GOSSANS_DATA || "/data";</script>
 {style}{schema}{head_extra}
 </head>
 <body>
