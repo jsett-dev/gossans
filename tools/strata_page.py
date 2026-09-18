@@ -512,7 +512,7 @@ function gossansStrata() {
     padDem = { key: null, mesh: null };
     rebuild();
     target.set(x, y, (W.ground[wi] === null ? 0 : W.ground[wi]) * EXAG);
-    dist = 4000; pitch = 1.0; place();
+    dist = 4000; yaw = NORTH_UP; pitch = 1.0; place();
     buildPatch(wi);
     buildPadGround(wi);
     wellCard(wi, pad);
@@ -712,11 +712,11 @@ function gossansStrata() {
         groundMode = "imagery"; showLabels = false; showSurfaces = false;
         showGrid = true; showPaths = false;
         data.formations.forEach(function (f, i) { hidden[i] = true; });
-        pitch = 0.45;
+        yaw = NORTH_UP; pitch = OVERHEAD;
       } else {
         groundMode = "relief"; showLabels = false; showPaths = true;
         data.formations.forEach(function (f, i) { hidden[i] = false; });
-        pitch = 0.9;
+        yaw = NORTH_UP; pitch = OVERHEAD;
       }
       layers(); drawLegend(); syncAllButton(); applyGround(); applyVisible(); place();
     };
@@ -1564,7 +1564,8 @@ function gossansStrata() {
   }
 
   // ---- camera: drag to rotate, wheel to zoom, shift or right button to pan
-  var target = new THREE.Vector3(), dist = 60000, yaw = 0.6, pitch = 0.9;
+  var NORTH_UP = -Math.PI / 2, OVERHEAD = 0.15;
+  var target = new THREE.Vector3(), dist = 60000, yaw = NORTH_UP, pitch = OVERHEAD;
   function place() {
     var r = Math.max(2000, dist);
     camera.position.set(
@@ -1626,7 +1627,7 @@ function gossansStrata() {
     if (isolated >= 0 && data) {
       var W = data.wells;
       target.set(W.x[isolated], W.y[isolated], (W.ground[isolated] || 0) * EXAG);
-      dist = 4000; pitch = 1.0; place();
+      dist = 4000; yaw = NORTH_UP; pitch = 1.0; place();
       return;
     }
     var box = new THREE.Box3().setFromObject(root);
@@ -1640,7 +1641,7 @@ function gossansStrata() {
     camera.far = Math.max(40000, dist * 20);
     camera.near = Math.max(1, dist / 5000);
     camera.updateProjectionMatrix();
-    yaw = 0.6; pitch = 0.9; place();
+    yaw = NORTH_UP; pitch = OVERHEAD; place();
   }
   function bindCamera() {
     var down = null;
