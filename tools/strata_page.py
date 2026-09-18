@@ -1022,7 +1022,7 @@ function gossansStrata() {
 
   function makeTerrain() {
     var group = new THREE.Group(), tiles = {}, queue = [], inflight = 0;
-    var m = metres(), frustum = new THREE.Frustum(), pm = new THREE.Matrix4();
+    var m = metres();
     var base = [], pending = false, drapeTimer = null;
     var loader = new THREE.TextureLoader();
     loader.setCrossOrigin("anonymous");
@@ -1077,7 +1077,9 @@ function gossansStrata() {
         grey[k * 3] = grey[k * 3 + 1] = grey[k * 3 + 2] = g2;
       }
       // Skirts: the edge ring again, dropped, so neighbouring tiles at a
-      // different level do not show a crack of sky between them.
+      // different level do not show a crack of sky between them. Three
+      // percent of the tile's width: a shallower skirt lets slivers of sky
+      // through from beneath where a coarse neighbour is not yet stitched.
       var drop = Math.max(3, t.size * 0.03), sk = N * N, edges = [];
       for (i = 0; i < N; i++) edges.push(i);                       // south row
       for (j = 0; j < N; j++) edges.push(j * N + N - 1);           // east column
@@ -1092,7 +1094,7 @@ function gossansStrata() {
       var idx = [];
       for (j = 0; j < N - 1; j++) for (i = 0; i < N - 1; i++) {
         var q = j * N + i;
-        idx.push(q, q + N, q + 1, q + 1, q + N, q + N + 1);
+        idx.push(q, q + 1, q + N, q + 1, q + N + 1, q + N);   // wound so the front face looks up
       }
       for (k = 0; k < skirt; k++) {
         var e0 = edges[k], e1 = edges[(k + 1) % skirt], s0 = sk + k, s1 = sk + (k + 1) % skirt;
@@ -1104,9 +1106,24 @@ function gossansStrata() {
       g.setIndex(idx);
       g.userData = { ramp: new THREE.BufferAttribute(ramp, 3), grey: new THREE.BufferAttribute(grey, 3), uv0: uv };
       g.setAttribute("color", g.userData.ramp);
-      var mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
-        vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: groundOpacity,
-        depthWrite: true, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }));
+      // Three faces of one geometry: the top, drawn front-side only; the
+      // same triangles again as the underside, back-side only, one flat
+      // tone with the relief shading, so from beneath the ground is a
+      // surface and not a patchwork of photographs; and the skirts.
+      var nSurf = (N - 1) * (N - 1) * 6, nSkirt = skirt * 6;
+      g.addGroup(0, nSurf, 0);
+      g.addGroup(0, nSurf, 2);
+      g.addGroup(nSurf, nSkirt, 1);
+      var common = { vertexColors: true, transparent: true, opacity: groundOpacity,
+                     depthWrite: true, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 };
+      var top = new THREE.MeshBasicMaterial(Object.assign({ side: THREE.FrontSide }, common));
+      // The skirts wear the underside's tone rather than the photograph:
+      // seen from beneath they then read as the same surface, not as a
+      // lattice of walls, and from above they only ever show through a
+      // hairline crack.
+      var skirtMat = new THREE.MeshBasicMaterial(Object.assign({ side: THREE.DoubleSide, color: 0x7d7268 }, common));
+      var under = new THREE.MeshBasicMaterial(Object.assign({ side: THREE.BackSide, color: 0x7d7268 }, common));
+      var mesh = new THREE.Mesh(g, [top, skirtMat, under]);
       mesh.renderOrder = 0;
       var node = new THREE.Group();
       node.add(mesh);
@@ -1164,7 +1181,7 @@ function gossansStrata() {
     // ---- what a tile wears
     function applyMode(t) {
       if (!t.node) return;
-      var mesh = t.node.userData.mesh, g = mesh.geometry, mat = mesh.material;
+      var mesh = t.node.userData.mesh, g = mesh.geometry, mat = mesh.material[0];
       if (groundMode === "relief" || groundMode === "off") {
         g.setAttribute("color", g.userData.ramp); mat.map = null;
       } else {
@@ -1193,8 +1210,7 @@ function gossansStrata() {
         }
         g.setAttribute("uv", g.userData.uvd[d]);
       }
-      mat.opacity = groundOpacity;
-      mat.needsUpdate = true;
+      mesh.material.forEach(function (mm) { mm.opacity = groundOpacity; mm.needsUpdate = true; });
     }
 
     // ---- fetching, nearest first, a few at a time
@@ -1215,7 +1231,7 @@ function gossansStrata() {
     }
     function pump() {
       if (inflight >= INFLIGHT || !queue.length) return;
-      var cp = camera.position;
+      var cp = target;
       queue.sort(function (p, q) {
         var dp = (p.cx - cp.x) * (p.cx - cp.x) + (p.cy - cp.y) * (p.cy - cp.y);
         var dq = (q.cx - cp.x) * (q.cx - cp.x) + (q.cy - cp.y) * (q.cy - cp.y);
@@ -1248,7 +1264,7 @@ function gossansStrata() {
         }
         if (!buildTile(t, dem)) t.state = "failed";
         pump();
-        schedule();
+        schedule(true);
       });
     }
 
@@ -1269,15 +1285,18 @@ function gossansStrata() {
       if (t.node) t.node.visible = false;
       if (t.children) t.children.forEach(hideTree);
     }
+    // Detail is a pyramid around the point the camera looks at, sized by
+    // the zoom distance and nothing else. The finest level lies under the
+    // point and out to half the distance; each level coarser reaches about
+    // twice as far. Where the camera stands, and which way it faces, play
+    // no part, so a turn or a tilt never changes the tree.
     function visit(t, now) {
-      var bx = box(t);
-      if (!frustum.intersectsBox(bx)) { hideTree(t); return; }
       t.used = now;
-      var cp = camera.position;
-      var nx = Math.max(bx.min.x, Math.min(bx.max.x, cp.x)), ny = Math.max(bx.min.y, Math.min(bx.max.y, cp.y));
-      var nz = Math.max(bx.min.z, Math.min(bx.max.z, cp.z));
-      var d = Math.sqrt((nx - cp.x) * (nx - cp.x) + (ny - cp.y) * (ny - cp.y) + (nz - cp.z) * (nz - cp.z));
-      var ratio = t.size / Math.max(d, 1);
+      var half = t.size / 2, hy = ((t.b.lat1 - t.b.lat0) * m.lat) / 2;
+      var dx = Math.max(0, Math.abs(target.x - t.cx) - half), dy = Math.max(0, Math.abs(target.y - t.cy) - hy);
+      var dxy = Math.sqrt(dx * dx + dy * dy);
+      var reach = dist + Math.max(0, dxy - dist * 0.5);
+      var ratio = t.size / Math.max(reach, 1);
       var shown = t.children && t.children.some(function (c) { return c.node && c.node.visible; });
       var want = t.z < Z_MAX && ratio > (shown ? SPLIT * 0.6 : SPLIT);
       if (t.state === "empty") request(t);
@@ -1294,14 +1313,20 @@ function gossansStrata() {
       }
       if (t.node) t.node.visible = groundMode !== "off";
     }
-    function update() {
+    // Nothing to do unless the look-at point, the distance, the
+    // exaggeration or the ground mode changed since last time; a drag that
+    // only turns the view returns here at once. Edges are restitched only
+    // when the set of drawn tiles changed.
+    var lastKey = "", lastDrawn = "";
+    function update(force) {
       if (!camera || !base.length) return;
-      camera.updateMatrixWorld();
-      pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-      frustum.setFromProjectionMatrix(pm);
+      var k = [Math.round(target.x), Math.round(target.y), Math.round(dist), EXAG, groundMode].join("|");
+      if (!force && k === lastKey && !queue.length && !inflight) return;
+      lastKey = k;
       var now = Date.now();
       base.forEach(function (t) { visit(t, now); });
-      stitchAll();
+      var drawn = Object.keys(tiles).filter(function (kk) { var t = tiles[kk]; return t.node && t.node.visible; }).sort().join(",");
+      if (drawn !== lastDrawn) { lastDrawn = drawn; stitchAll(); }
       pump();
       evict(now);
     }
@@ -1370,9 +1395,15 @@ function gossansStrata() {
       });
     }
     var schedTimer = null;
-    function schedule() {
+    var schedForce = false;
+    function schedule(force) {
+      if (force) schedForce = true;
       if (schedTimer) return;
-      schedTimer = setTimeout(function () { schedTimer = null; update(); }, 120);
+      schedTimer = setTimeout(function () {
+        schedTimer = null;
+        var f = schedForce; schedForce = false;
+        update(f);
+      }, 120);
     }
     // Tiles not looked at for a minute are let go, finest first, once there
     // are more than a few hundred of them.
