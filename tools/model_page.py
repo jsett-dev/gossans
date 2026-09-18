@@ -264,7 +264,10 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     var d=$("detail");
     if(!sel){ return; }
     var s=[];
-    s.push("<b>T"+sel.twp+"N R"+sel.rge+"W</b>"+(sel.county?" &middot; "+sel.county+" County":""));
+    var tt = String(sel.twp), rr = String(sel.rge);
+    if (!/[NS]$/.test(tt)) tt += "N";
+    if (!/[EW]$/.test(rr)) rr += "W";
+    s.push("<b>T"+tt+" R"+rr+"</b>"+(sel.county?" &middot; "+sel.county+" County":""));
     s.push(sel.wells+" wells, "+sel.fitted+" with a sound fit"+
       (sel.refused?", "+sel.refused+" refused":""));
     if(sel.thin) s.push("<b>Too few sound fits to report a median.</b> "+
@@ -369,9 +372,15 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       qq:  {color:"#b7532e", weight:0.4, fill:false, opacity:0.75}
     };
 
-    (data.cells || []).forEach(function(c){
-      cellBy[c.twp + "N " + c.rge + "W"] = c;
-    });
+    // Cells carry the direction the state filed - 42N 75W, 4S 60E - and
+    // older exports carried none, meaning north and west. One key for both.
+    function tkey(t, r){
+      t = String(t); r = String(r);
+      if (!/[NS]$/.test(t)) t += "N";
+      if (!/[EW]$/.test(r)) r += "W";
+      return t + " " + r;
+    }
+    (data.cells || []).forEach(function(c){ cellBy[tkey(c.twp, c.rge)] = c; });
 
     townshipsGeoJSON().then(function(g){
         if (!g) return;
@@ -566,13 +575,18 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       var p = f.properties, c = f.geometry.coordinates;
       var v = p[mapView.k];
       var style;
-      // Three states, and they are not the same thing. A refused fit is a well
-      // we decline to value. A missing measure is a well we cannot normalise
-      // because its perforated interval was never filed. Calling the second
-      // one "refused" would be the same lie the grid used to tell.
+      // Four states, and they are not the same thing. A well never fitted
+      // has no oil history to fit: most of the basin's gas and coalbed wells.
+      // A refused fit is a well we decline to value. A missing measure is a
+      // well we cannot normalise because its perforated interval was never
+      // filed. Calling any of these "refused" would be the same lie the grid
+      // used to tell.
+      var fit = p.fit || (p.sound ? "sound" : "refused");
       if (mapView.k === "none") {
         style = {radius:3.5, color:"#6f7472", weight:1, fill:false, opacity:0.8};
-      } else if (!p.sound) {
+      } else if (fit === "none") {
+        style = {radius:2, color:"#9aa0a6", weight:0.8, fill:false, opacity:0.5};
+      } else if (fit === "refused") {
         style = {radius:3, color:"#b0574a", weight:1.1, fill:false,
                  opacity:0.75, dashArray:"2,2"};
       } else if (!v) {
@@ -591,7 +605,9 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
         (p.sound
           ? ((p.eur ? "Recovery " + p.eur.toLocaleString() + " bbl<br>" : "") +
              (p.perft ? p.perft.toLocaleString() + " bbl per 1,000 ft<br>" : ""))
-          : "<i>Fit refused. No recovery number is claimed for this well.</i><br>") +
+          : (fit === "none"
+             ? "<i>No oil history to fit.</i><br>"
+             : "<i>Fit refused. No recovery number is claimed for this well.</i><br>")) +
         "<span style='color:#777'>API " + p.api + "</span>");
       layer.addLayer(m);
     });
@@ -613,12 +629,19 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
           'background:'+shade(t)+'"></i>'+Math.round(v).toLocaleString()+'</span>');
       }
       var refused = wellData.features.filter(function(f){
-        return !f.properties.sound; }).length;
+        return (f.properties.fit || (f.properties.sound ? "sound" : "refused")) === "refused"; }).length;
+      var unfitted = wellData.features.filter(function(f){
+        return f.properties.fit === "none"; }).length;
       var nomeasure = wellData.features.filter(function(f){
         return f.properties.sound && !f.properties[mapView.k]; }).length;
       parts.push('<span><i class="sw" style="border-radius:50%;width:12px;'+
         'background:transparent;border:1px dashed #b0574a"></i>fit refused ('+
         refused.toLocaleString()+')</span>');
+      if (unfitted) {
+        parts.push('<span><i class="sw" style="border-radius:50%;width:12px;'+
+          'background:transparent;border-color:#9aa0a6"></i>no oil history to fit ('+
+          unfitted.toLocaleString()+')</span>');
+      }
       if (nomeasure) {
         var why = (mapView.k === "perft")
           ? "no perforated interval filed" : "no recovery figure";
@@ -649,7 +672,8 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     $("hdr").innerHTML = j.wells_total.toLocaleString()+" wells &middot; "+
       j.months.toLocaleString()+" production months &middot; "+
       j.wells_sound.toLocaleString()+" sound fits &middot; "+
-      j.counties.join(" and ")+" counties";
+      (j.counties.length <= 3 ? j.counties.join(" and ")+" counties"
+                               : j.counties.length+" counties across Wyoming and Montana");
     var names={};
     j.cells.forEach(function(c){ for(var k in (c.structure||{})) names[k]=1; });
     formation=Object.keys(names).sort()[0]||null;
