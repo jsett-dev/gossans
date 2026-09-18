@@ -640,7 +640,7 @@ function gossansStrata() {
       return '<option value="' + k + '"' + (k === groundMode ? " selected" : "") + ">" +
              BASEMAPS[k].label + "</option>";
     }).join("") + "</select></label>";
-    sel += '<label title="Below 0.8 the ground shows what is beneath it">Ground opacity <input id="cgo" type="range" min="0.2" max="1" step="0.05" value="' + groundOpacity + '"></label>';
+    sel += '<label>Ground opacity <input id="cgo" type="range" min="0.2" max="1" step="0.05" value="' + groundOpacity + '"></label>';
     box.innerHTML = sel + LAYERS.map(function (L) {
       return '<label><input id="' + L.id + '" type="checkbox"' +
              (L.get() ? " checked" : "") + "> " + L.label + "</label>";
@@ -832,7 +832,7 @@ function gossansStrata() {
       }
       p.userData = { formation: fi, anchor: [mid(xs), mid(ys), mid(zs)],
                      wi: pwi, ti: pti };
-      tops.push(p); root.add(p);
+      p.renderOrder = -2; tops.push(p); root.add(p);
     });
 
     // A symbol at every wellhead, on the ground, one point cloud per type,
@@ -852,7 +852,7 @@ function gossansStrata() {
         map: symbol(+ty).tex, size: 10, sizeAttenuation: false,
         transparent: true, alphaTest: 0.04, depthWrite: false }));
       pts.userData = { heads: true, wi: byType[ty].wi, type: +ty };
-      heads.push(pts); root.add(pts);
+      pts.renderOrder = 2; heads.push(pts); root.add(pts);
     });
     sizeHeads();
     hasPathArr = hasPath;
@@ -900,7 +900,7 @@ function gossansStrata() {
       var l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
         color: pair[1], transparent: true, opacity: 0.7 }));
       l.userData = { prod: pair[2] };
-      lines.push(l); root.add(l);
+      l.renderOrder = -2; lines.push(l); root.add(l);
     });
 
     buildSurfaces();
@@ -1024,9 +1024,9 @@ function gossansStrata() {
                    shade: new THREE.BufferAttribute(grey, 3) };
     ground = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
       vertexColors: true, side: THREE.DoubleSide,
-      transparent: true, opacity: groundOpacity, depthWrite: occlude(),
+      transparent: true, opacity: groundOpacity, depthWrite: true,
       polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }));
-    ground.renderOrder = -1;
+    ground.renderOrder = 0;
     root.add(ground);
     applyGround();
   }
@@ -1064,6 +1064,7 @@ function gossansStrata() {
         contourLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
           vertexColors: true, transparent: true, opacity: 0.8 }));
         contourLines.userData = { keep: true };
+        contourLines.renderOrder = 2;
         root.add(contourLines);
         applyVisible();
       }).catch(function () { contoursDoc = null; });
@@ -1253,9 +1254,9 @@ function gossansStrata() {
       var uv = padUv(lon0, lat0, stepLon, stepLat, nx, ny, L.z);
       g.setAttribute("uv", new THREE.BufferAttribute(uv.arr, 2));
       var mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: uv.tex, side: THREE.DoubleSide,
-        transparent: true, opacity: groundOpacity, depthWrite: occlude(),
+        transparent: true, opacity: groundOpacity, depthWrite: true,
         polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
-      mesh.renderOrder = 0;
+      mesh.renderOrder = 1;
       if (patch) root.remove(patch);
       patch = mesh;
       root.add(patch);
@@ -1329,6 +1330,7 @@ function gossansStrata() {
     g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
     g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
     padContours = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
+    padContours.renderOrder = 2;
     root.add(padContours);
     applyVisible();
   }
@@ -1384,10 +1386,6 @@ function gossansStrata() {
     return tex;
   }
 
-  // Nearly opaque ground hides what is behind it; see-through ground does
-  // not, which is what the strata view wants.
-  function occlude() { return groundOpacity >= 0.8; }
-
   function applyGround() {
     var credit = document.getElementById("credit");
     if (credit) credit.innerHTML = (BASEMAPS[groundMode] || {}).credit || "";
@@ -1402,8 +1400,8 @@ function gossansStrata() {
       g.setAttribute("color", g.userData.shade);
       m.map = loadBasemap(groundMode);
     }
-    m.opacity = groundOpacity; m.depthWrite = occlude();
-    if (patch) { patch.material.opacity = groundOpacity; patch.material.depthWrite = occlude(); }
+    m.opacity = groundOpacity;
+    if (patch) patch.material.opacity = groundOpacity;
     m.needsUpdate = true;
     focus.key = null; focusSoon();
   }
@@ -1443,6 +1441,7 @@ function gossansStrata() {
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));
     gridLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
       color: 0x54606b, transparent: true, opacity: 0.55 }));
+    gridLines.renderOrder = 2;
     root.add(gridLines);
   }
 
@@ -1510,7 +1509,7 @@ function gossansStrata() {
         side: THREE.DoubleSide, depthWrite: false });
       var m = new THREE.Mesh(geo, mat);
       m.userData = { name: sf.name };
-      meshes.push(m);
+      m.renderOrder = -2; meshes.push(m);
       root.add(m);
     });
   }
