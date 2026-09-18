@@ -812,8 +812,13 @@ function gossansStrata() {
       el.className = "flabel";
       el.textContent = f.name;
       box.appendChild(el);
-      labels.push({ el: el, f: p.userData.formation, a: p.userData.anchor });
+      labels.push({ el: el, f: p.userData.formation, a: p.userData.anchor,
+                    n: f.tops || 0 });
     });
+    // Placed most-picked first, so when two names would collide it is the
+    // obscure one that gives way. With 240 names in the region, first-come
+    // put Tomcat A on the screen and Big George off it.
+    labels.sort(function (a, b) { return b.n - a.n; });
   }
 
   function placeLabels() {
