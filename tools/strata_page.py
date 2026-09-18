@@ -603,65 +603,6 @@ function gossansStrata() {
     document.getElementById("w-all").addEventListener("click", function () { clearIsolate(true); });
   }
 
-  // The ground within about three kilometres of the well, re-draped in
-  // tiles at pad scale so the pad and its access are legible. Same terrain
-  // vertices, a second small mesh, its own tile frame.
-  function buildPatch(wi) {
-    if (patch) { root.remove(patch); patch = null; }
-    if (!terr || groundMode === "off" || groundMode === "relief") return;
-    var W = data.wells, m = metres();
-    var lon = data.origin.lon + W.x[wi] / m.lon, lat = data.origin.lat + W.y[wi] / m.lat;
-    var half = 3000 / m.lat, halfLon = 3000 / m.lon;
-    var i0 = Math.max(0, Math.floor((lon - halfLon - terr.min_lon) / terr.step_lon - 0.5));
-    var i1 = Math.min(terr.nx - 1, Math.ceil((lon + halfLon - terr.min_lon) / terr.step_lon - 0.5));
-    var j0 = Math.max(0, Math.floor((lat - half - terr.min_lat) / terr.step_lat - 0.5));
-    var j1 = Math.min(terr.ny - 1, Math.ceil((lat + half - terr.min_lat) / terr.step_lat - 0.5));
-    if (i1 - i0 < 1 || j1 - j0 < 1) return;
-    var z = 14, n = 1 << z;
-    var a = mercator(terr.min_lon + (i0 + 0.5) * terr.step_lon, terr.min_lat + (j1 + 0.5) * terr.step_lat);
-    var b = mercator(terr.min_lon + (i1 + 0.5) * terr.step_lon, terr.min_lat + (j0 + 0.5) * terr.step_lat);
-    var fr = { z: z, n: n, tx0: Math.floor(a[0] * n), ty0: Math.floor(a[1] * n),
-               tx1: Math.floor(b[0] * n), ty1: Math.floor(b[1] * n) };
-    fr.w = (fr.tx1 - fr.tx0 + 1) * 256; fr.h = (fr.ty1 - fr.ty0 + 1) * 256;
-    var cols = i1 - i0 + 1, rows = j1 - j0 + 1;
-    var pos = new Float32Array(cols * rows * 3), uv = new Float32Array(cols * rows * 2), k = 0;
-    var gpos = ground.geometry.getAttribute("position");
-    for (var j = j0; j <= j1; j++) {
-      for (var i = i0; i <= i1; i++, k++) {
-        var src = j * terr.nx + i;
-        pos[k * 3] = gpos.getX(src); pos[k * 3 + 1] = gpos.getY(src); pos[k * 3 + 2] = gpos.getZ(src) + 2;
-        var mc = mercator(terr.min_lon + (i + 0.5) * terr.step_lon, terr.min_lat + (j + 0.5) * terr.step_lat);
-        uv[k * 2] = (mc[0] * n * 256 - fr.tx0 * 256) / fr.w;
-        uv[k * 2 + 1] = 1 - (mc[1] * n * 256 - fr.ty0 * 256) / fr.h;
-      }
-    }
-    var idx = [];
-    for (var jj = 0; jj < rows - 1; jj++) for (var ii = 0; ii < cols - 1; ii++) {
-      var q = jj * cols + ii;
-      idx.push(q, q + cols, q + 1, q + 1, q + cols, q + cols + 1);
-    }
-    var g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
-    g.setIndex(idx);
-    var canvas = document.createElement("canvas");
-    canvas.width = fr.w; canvas.height = fr.h;
-    var ctx = canvas.getContext("2d");
-    var tex = new THREE.CanvasTexture(canvas);
-    tex.anisotropy = 4;
-    var bm = BASEMAPS[groundMode];
-    for (var ty = fr.ty0; ty <= fr.ty1; ty++) for (var tx = fr.tx0; tx <= fr.tx1; tx++) (function (tx, ty) {
-      var img = new Image(); img.crossOrigin = "anonymous";
-      img.onload = function () { ctx.drawImage(img, (tx - fr.tx0) * 256, (ty - fr.ty0) * 256); tex.needsUpdate = true; };
-      img.src = bm.url.replace("{z}", fr.z).replace("{x}", tx).replace("{y}", ty);
-    })(tx, ty);
-    patch = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide,
-      transparent: true, opacity: groundOpacity, depthWrite: false,
-      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-    patch.renderOrder = 0;
-    root.add(patch);
-  }
-
   //: every layer in the scene, with the flag it sets and what it is called.
   var LAYERS = [
     {id: "ck", label: "Township grid", get: function () { return showGrid; },
@@ -699,7 +640,7 @@ function gossansStrata() {
       return '<option value="' + k + '"' + (k === groundMode ? " selected" : "") + ">" +
              BASEMAPS[k].label + "</option>";
     }).join("") + "</select></label>";
-    sel += '<label>Ground opacity <input id="cgo" type="range" min="0.2" max="1" step="0.05" value="' + groundOpacity + '"></label>';
+    sel += '<label title="Below 0.8 the ground shows what is beneath it">Ground opacity <input id="cgo" type="range" min="0.2" max="1" step="0.05" value="' + groundOpacity + '"></label>';
     box.innerHTML = sel + LAYERS.map(function (L) {
       return '<label><input id="' + L.id + '" type="checkbox"' +
              (L.get() ? " checked" : "") + "> " + L.label + "</label>";
@@ -760,12 +701,12 @@ function gossansStrata() {
       if (name === "surface") {
         // Wellbores are underground; on a surface view they are haze. The
         // wellheads stay, faint, so a hover still names the well.
-        groundMode = "imagery"; showLabels = false; showSurfaces = false;
+        groundMode = "imagery"; groundOpacity = 0.95; showLabels = false; showSurfaces = false;
         showGrid = true; showPaths = false;
         data.formations.forEach(function (f, i) { hidden[i] = true; });
         yaw = NORTH_UP; pitch = OVERHEAD;
       } else {
-        groundMode = "relief"; showLabels = false; showPaths = true;
+        groundMode = "relief"; groundOpacity = 0.6; showLabels = false; showPaths = true;
         data.formations.forEach(function (f, i) { hidden[i] = false; });
         yaw = NORTH_UP; pitch = OVERHEAD;
       }
@@ -1083,7 +1024,8 @@ function gossansStrata() {
                    shade: new THREE.BufferAttribute(grey, 3) };
     ground = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
       vertexColors: true, side: THREE.DoubleSide,
-      transparent: true, opacity: 0.72, depthWrite: false }));
+      transparent: true, opacity: groundOpacity, depthWrite: occlude(),
+      polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }));
     ground.renderOrder = -1;
     root.add(ground);
     applyGround();
@@ -1108,7 +1050,7 @@ function gossansStrata() {
             var px = (c[i][0] - data.origin.lon) * m.lon, py = (c[i][1] - data.origin.lat) * m.lat;
             var gz = terrainAt(px, py);
             if (gz === null) { prev = null; continue; }
-            var cur = [px, py, gz + 1.5];
+            var cur = [px, py, gz + 0.3];
             if (prev) {
               pts.push(prev[0], prev[1], prev[2], cur[0], cur[1], cur[2]);
               cols.push(shade, shade, shade, shade, shade, shade);
@@ -1297,7 +1239,7 @@ function gossansStrata() {
         var k = j * nx + i;
         pos[k * 3] = (lon0 + (i + 0.5) * stepLon - data.origin.lon) * m.lon;
         pos[k * 3 + 1] = (lat0 + (j + 0.5) * stepLat - data.origin.lat) * m.lat;
-        pos[k * 3 + 2] = isNaN(z) ? 0 : z + 0.5;
+        pos[k * 3 + 2] = isNaN(z) ? 0 : z;
       }
       var idx = [];
       for (var jj = 0; jj < ny - 1; jj++) for (var ii = 0; ii < nx - 1; ii++) {
@@ -1311,8 +1253,8 @@ function gossansStrata() {
       var uv = padUv(lon0, lat0, stepLon, stepLat, nx, ny, L.z);
       g.setAttribute("uv", new THREE.BufferAttribute(uv.arr, 2));
       var mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: uv.tex, side: THREE.DoubleSide,
-        transparent: true, opacity: groundOpacity, depthWrite: false,
-        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+        transparent: true, opacity: groundOpacity, depthWrite: occlude(),
+        polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
       mesh.renderOrder = 0;
       if (patch) root.remove(patch);
       patch = mesh;
@@ -1323,69 +1265,6 @@ function gossansStrata() {
       if (note) note.textContent = "Ground within " + (L.window_m / 2000).toFixed(1) + " km is the one-metre model at " +
         (cell < 10 ? cell.toFixed(1) : Math.round(cell)) + " m, contours at " + L.interval + " m, imagery at zoom " + L.z + ".";
     });
-  }
-
-  var padDem = { key: null, mesh: null };
-  function buildPadGround(wi) {
-    if (!terr) return;
-    var W = data.wells, m = metres(), cell = 8, half = 3000;
-    var lon = data.origin.lon + W.x[wi] / m.lon, lat = data.origin.lat + W.y[wi] / m.lat;
-    var stepLat = cell / m.lat, stepLon = cell / m.lon;
-    var nx = Math.round(2 * half / cell), ny = nx;
-    var lon0 = lon - nx / 2 * stepLon, lat0 = lat - ny / 2 * stepLat;
-    var key = wi;
-    if (padDem.key === key && padDem.mesh) return;
-    var url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?" +
-      "bbox=" + [lon0, lat0, lon0 + nx * stepLon, lat0 + ny * stepLat].join(",") +
-      "&bboxSR=4326&imageSR=4326&size=" + nx + "," + ny + "&format=tiff&pixelType=F32" +
-      "&interpolation=RSP_BilinearInterpolation&f=image";
-    var attempt = function (n) {
-      return fetch(url).then(function (r) { return r.ok ? r.arrayBuffer() : null; })
-        .catch(function () { return null; })
-        .then(function (buf) {
-          if (!buf && n > 0) return new Promise(function (res) { setTimeout(res, 1500); }).then(function () { return attempt(n - 1); });
-          return buf;
-        });
-    };
-    attempt(2).then(function (buf) {
-      if (!buf || isolated !== wi) return;
-      var t = readTiffF32(buf);
-      if (t.w !== nx || t.h !== ny) return;
-      // Rows arrive north-first; the grid counts north-up.
-      var pos = new Float32Array(nx * ny * 3), grid = new Float32Array(nx * ny);
-      for (var j = 0; j < ny; j++) for (var i = 0; i < nx; i++) {
-        var z = t.z[(ny - 1 - j) * nx + i];
-        if (!(z > -500 && z < 4500)) z = NaN;
-        grid[j * nx + i] = z;
-        var k = j * nx + i;
-        pos[k * 3] = (lon0 + (i + 0.5) * stepLon - data.origin.lon) * m.lon;
-        pos[k * 3 + 1] = (lat0 + (j + 0.5) * stepLat - data.origin.lat) * m.lat;
-        pos[k * 3 + 2] = isNaN(z) ? 0 : z + 1;
-      }
-      var idx = [];
-      for (var jj = 0; jj < ny - 1; jj++) for (var ii = 0; ii < nx - 1; ii++) {
-        var q = jj * nx + ii;
-        if (isNaN(grid[q]) || isNaN(grid[q + 1]) || isNaN(grid[q + nx]) || isNaN(grid[q + nx + 1])) continue;
-        idx.push(q, q + nx, q + 1, q + 1, q + nx, q + nx + 1);
-      }
-      // The pad ground replaces the coarse patch: same tiles, real relief.
-      if (patch) { root.remove(patch); patch = null; }
-      var g = new THREE.BufferGeometry();
-      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-      g.setIndex(idx);
-      var uv = padUv(lon0, lat0, stepLon, stepLat, nx, ny);
-      g.setAttribute("uv", new THREE.BufferAttribute(uv.arr, 2));
-      patch = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: uv.tex, side: THREE.DoubleSide,
-        transparent: true, opacity: groundOpacity, depthWrite: false,
-        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
-      patch.renderOrder = 0;
-      root.add(patch);
-      padDem = { key: key, mesh: patch };
-      buildPadContours(grid, nx, ny, lon0, lat0, stepLon, stepLat, 2);
-      var card = document.getElementById("wellcard");
-      var note = card && card.querySelector(".gnote");
-      if (note) note.textContent = "Ground within 3 km is the one-metre model at " + cell + " m, with contours at 2 m. Roads and the pad are in the imagery.";
-    }).catch(function () {});
   }
 
   // Tiles for the pad window at z14, as a texture and the UVs to fit it.
@@ -1440,7 +1319,7 @@ function gossansStrata() {
         pairs.forEach(function (pr) {
           var p0 = e[pr[0]], p1 = e[pr[1]];
           if (!p0 || !p1) return;
-          pts.push(p0[0], p0[1], level + 1.5, p1[0], p1[1], level + 1.5);
+          pts.push(p0[0], p0[1], level + 0.3, p1[0], p1[1], level + 0.3);
           cols.push(shade, shade, shade, shade, shade, shade);
         });
       }
@@ -1505,6 +1384,10 @@ function gossansStrata() {
     return tex;
   }
 
+  // Nearly opaque ground hides what is behind it; see-through ground does
+  // not, which is what the strata view wants.
+  function occlude() { return groundOpacity >= 0.8; }
+
   function applyGround() {
     var credit = document.getElementById("credit");
     if (credit) credit.innerHTML = (BASEMAPS[groundMode] || {}).credit || "";
@@ -1519,8 +1402,8 @@ function gossansStrata() {
       g.setAttribute("color", g.userData.shade);
       m.map = loadBasemap(groundMode);
     }
-    m.opacity = groundOpacity;
-    if (patch) patch.material.opacity = groundOpacity;
+    m.opacity = groundOpacity; m.depthWrite = occlude();
+    if (patch) { patch.material.opacity = groundOpacity; patch.material.depthWrite = occlude(); }
     m.needsUpdate = true;
     focus.key = null; focusSoon();
   }
@@ -1539,7 +1422,7 @@ function gossansStrata() {
         var t = i / n, x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
         var z = terrainAt(x, y);
         if (z === null) { prev = null; continue; }
-        var cur = [x, y, z + 2];
+        var cur = [x, y, z + 0.3];
         if (prev) pts.push(prev[0], prev[1], prev[2], cur[0], cur[1], cur[2]);
         prev = cur;
       }
