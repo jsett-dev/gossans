@@ -49,6 +49,8 @@ PANE = r"""
         <canvas id="scene"></canvas>
         <div id="hud" class="hud">loading&hellip;</div>
         <div id="flabels" class="flabels" aria-hidden="true"></div>
+        <div id="tip" class="tip" role="status"></div>
+        <div id="credit" class="credit"></div>
         <div id="compass" class="compass" aria-hidden="true">
           <svg viewBox="-50 -50 100 100">
             <g id="rose">
@@ -81,8 +83,10 @@ PANE = r"""
           wellbore, following its filed survey where one exists and vertical
           where none does. The ground is the USGS bare-earth elevation model
           on a <span class="t-step">&hellip;</span> grid, with the township
-          lines laid on it. Every
-          switch that changes what is drawn is in the legend below.
+          lines laid on it, and it can wear a basemap: aerial imagery, the
+          USGS topographic map, or OpenStreetMap. Hover a wellhead or a top
+          for what it is. Every switch that changes what is drawn is in the
+          legend below.
         </p>
       </div>
     </div>
@@ -239,6 +243,20 @@ STYLE = r"""
 /* Formation names drawn over the scene. Each sits at the middle of its own
    tops, so where a layer is not drawn there is no name for it either. */
 .flabels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+/* What the cursor is over. Drawn in the page, never in the scene. */
+.tip { position: absolute; display: none; pointer-events: none; z-index: 5;
+  font-family: var(--f-data); font-size: 11px; line-height: 1.55; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--rule); padding: 6px 9px;
+  max-width: 36ch; }
+.tip b { color: var(--ink); }
+.tip .m { color: var(--ink-3); }
+/* The basemap's credit, in the corner it belongs in, never hidden. */
+.credit { position: absolute; right: 12px; bottom: 12px; font-family: var(--f-data);
+  font-size: 10px; color: var(--ink-2); background: var(--paper);
+  border: 1px solid var(--rule); padding: 2px 6px; pointer-events: none; }
+.credit:empty { display: none; }
+.lay3d select { font: inherit; font-size: 11px; border: 1px solid var(--rule);
+  background: var(--paper); color: var(--ink); padding: 2px 4px; }
 .flabel { position: absolute; transform: translate(-50%, -50%);
   font-family: var(--f-data); font-size: 10px; letter-spacing: .1em;
   text-transform: uppercase; color: var(--ink); background: var(--paper);
@@ -261,7 +279,8 @@ function gossansStrata() {
   if (!window.THREE) { fail("The 3D library did not load, so this view cannot draw."); return; }
 
   var EXAG = 15, showPaths = true, onlySurveyed = false, showSurfaces = false;
-  var showGround = true, showGrid = true, showLabels = true;
+  var groundMode = "relief", showGrid = true, showLabels = false;
+  var wellheads = null, hasPathArr = null, topsPerWell = null, pendingPreset = null;
   var hiddenNone = false, labels = [], combine = false;
   var data = null, surf = null, terr = null, plss = null, hidden = {};
   var renderer, scene, camera, root, tops = [], lines = [], meshes = [];
@@ -328,8 +347,6 @@ function gossansStrata() {
 
   //: every layer in the scene, with the flag it sets and what it is called.
   var LAYERS = [
-    {id: "cg", label: "Ground surface", get: function () { return showGround; },
-     set: function (v) { showGround = v; }},
     {id: "ck", label: "Township grid", get: function () { return showGrid; },
      set: function (v) { showGrid = v; }},
     {id: "cp", label: "Wellbores", get: function () { return showPaths; },
@@ -340,13 +357,36 @@ function gossansStrata() {
      set: function (v) { showSurfaces = v; }}
   ];
 
+  //: what the ground can wear. Terms read and recorded in the source
+  //: register before any of these was used; the credit is drawn on the scene.
+  var BASEMAPS = {
+    off:     {label: "Off"},
+    relief:  {label: "Shaded relief (3DEP)", credit: "Relief: USGS 3DEP"},
+    osm:     {label: "OpenStreetMap",
+              url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+              credit: "&copy; OpenStreetMap contributors"},
+    imagery: {label: "Aerial (USGS)",
+              url: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}",
+              credit: "Imagery: USDA, USGS The National Map"},
+    topo:    {label: "Topographic (USGS)",
+              url: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
+              credit: "USGS The National Map: Topo"}
+  };
+
   function layers() {
     var box = document.getElementById("layers3d");
     if (!box) return;
-    box.innerHTML = LAYERS.map(function (L) {
+    var sel = '<label>Ground <select id="cgm">' + Object.keys(BASEMAPS).map(function (k) {
+      return '<option value="' + k + '"' + (k === groundMode ? " selected" : "") + ">" +
+             BASEMAPS[k].label + "</option>";
+    }).join("") + "</select></label>";
+    box.innerHTML = sel + LAYERS.map(function (L) {
       return '<label><input id="' + L.id + '" type="checkbox"' +
              (L.get() ? " checked" : "") + "> " + L.label + "</label>";
     }).join("");
+    document.getElementById("cgm").addEventListener("change", function (e) {
+      groundMode = e.target.value; applyGround();
+    });
     LAYERS.forEach(function (L) {
       document.getElementById(L.id).addEventListener("change", function (e) {
         L.set(e.target.checked);
@@ -376,6 +416,27 @@ function gossansStrata() {
     // size until the switcher shows it and calls this back.
     window.gossansViews = window.gossansViews || {};
     window.gossansViews.resize3d = function(){ resize(); home(); };
+    // The Surface tab is this same scene wearing a basemap with the strata
+    // put away; the Three dimensions tab is the strata on shaded relief.
+    window.gossansViews.preset3d = function (name) {
+      if (!data) { pendingPreset = name; return; }
+      if (name === "surface") {
+        // Wellbores are underground; on a surface view they are haze. The
+        // wellheads stay, faint, so a hover still names the well.
+        groundMode = "imagery"; showLabels = false; showSurfaces = false;
+        showGrid = true; showPaths = false;
+        data.formations.forEach(function (f, i) { hidden[i] = true; });
+        pitch = 0.45;
+      } else {
+        groundMode = "relief"; showLabels = false; showPaths = true;
+        data.formations.forEach(function (f, i) { hidden[i] = false; });
+        pitch = 0.9;
+      }
+      layers(); drawLegend(); syncAllButton(); applyGround(); applyVisible(); place();
+    };
+    var pp = pendingPreset || window.gossansViews.pendingPreset;
+    pendingPreset = null; window.gossansViews.pendingPreset = null;
+    if (pp) window.gossansViews.preset3d(pp);
     bindCamera();
     renderer.setAnimationLoop(function () {
       renderer.render(scene, camera);
@@ -438,14 +499,17 @@ function gossansStrata() {
 
     // Tops, one point cloud per formation so the legend can toggle them.
     var deepest = new Float32Array(nW).fill(Infinity), hasTop = new Uint8Array(nW);
+    topsPerWell = new Uint16Array(nW);
     data.formations.forEach(function (f, fi) {
-      var T = data.tops[fi], pts = [];
+      var T = data.tops[fi], pts = [], pwi = [], pti = [];
       for (var i = 0; i < T.w.length; i++) {
         var wi = T.w[i], z = T.z[i];
         if (z < deepest[wi]) deepest[wi] = z;
         hasTop[wi] = 1;
+        topsPerWell[wi]++;
         if (!shown(wi)) continue;
         pts.push(W.x[wi], W.y[wi], z);
+        pwi.push(wi); pti.push(i);
       }
       if (!pts.length) return;
       var g = new THREE.BufferGeometry();
@@ -462,9 +526,32 @@ function gossansStrata() {
       for (var q = 0; q < pts.length; q += 3) {
         xs.push(pts[q]); ys.push(pts[q + 1]); zs.push(pts[q + 2]);
       }
-      p.userData = { formation: fi, anchor: [mid(xs), mid(ys), mid(zs)] };
+      p.userData = { formation: fi, anchor: [mid(xs), mid(ys), mid(zs)],
+                     wi: pwi, ti: pti };
       tops.push(p); root.add(p);
     });
+
+    // A mark at every wellhead, on the ground, so a hover can name the well
+    // without the scene carrying a label for it.
+    var hp = [], hwi = [];
+    for (var hw = 0; hw < nW; hw++) {
+      if (!shown(hw) || W.ground[hw] === null) continue;
+      hp.push(W.x[hw], W.y[hw], W.ground[hw]); hwi.push(hw);
+    }
+    if (hp.length) {
+      var hg = new THREE.BufferGeometry();
+      hg.setAttribute("position", new THREE.Float32BufferAttribute(hp, 3));
+      // Faint on purpose: these exist to be hovered, not to be seen from
+      // across the basin, where forty-six thousand of them are a blot.
+      wellheads = new THREE.Points(hg, new THREE.PointsMaterial({
+        color: 0x54606b, size: 2, sizeAttenuation: false,
+        transparent: true, opacity: 0.45 }));
+      wellheads.userData = { heads: true, wi: hwi };
+      root.add(wellheads);
+    } else {
+      wellheads = null;
+    }
+    hasPathArr = hasPath;
 
     // Wellbores, grouped by the formation each well was completed in, so a
     // formation switched off in the legend takes its producers with it. The
@@ -575,9 +662,13 @@ function gossansStrata() {
     }
     // No lights in this scene, so the relief is shaded here: a slope term from
     // the neighbouring cells, lit from the north-west the way a map is.
+    var grey = new Float32Array(nx * ny * 3), uv = new Float32Array(nx * ny * 2);
+    var fr = tileFrame();
     for (j = 0; j < ny; j++) {
       for (i = 0; i < nx; i++) {
         k = j * nx + i;
+        var lon = terr.min_lon + (i + 0.5) * terr.step_lon;
+        var lat = terr.min_lat + (j + 0.5) * terr.step_lat;
         var xw = pos[(j * nx + Math.max(0, i - 1)) * 3 + 2];
         var xe = pos[(j * nx + Math.min(nx - 1, i + 1)) * 3 + 2];
         var ys = pos[(Math.max(0, j - 1) * nx + i) * 3 + 2];
@@ -593,6 +684,16 @@ function gossansStrata() {
         col[k * 3]     = (0.85 - 0.30 * t) * shade;
         col[k * 3 + 1] = (0.77 - 0.24 * t) * shade;
         col[k * 3 + 2] = (0.63 - 0.06 * t) * shade;
+        // A basemap gets the relief as a grey multiplier, lighter than the
+        // ramp so the imagery keeps its own colour.
+        var g2 = 0.72 + 0.28 * Math.max(0, lit);
+        grey[k * 3] = grey[k * 3 + 1] = grey[k * 3 + 2] = g2;
+        // Where this vertex sits on a web-mercator tile canvas of the
+        // region, so any tile basemap drapes exactly despite the grid
+        // being geographic and the tiles not.
+        var mc = mercator(lon, lat);
+        uv[k * 2] = (mc[0] * fr.n * 256 - fr.tx0 * 256) / fr.w;
+        uv[k * 2 + 1] = 1 - (mc[1] * fr.n * 256 - fr.ty0 * 256) / fr.h;
       }
     }
     var idx = new Uint32Array((nx - 1) * (ny - 1) * 6), p = 0;
@@ -606,12 +707,84 @@ function gossansStrata() {
     var g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
     g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.userData = { ramp: new THREE.BufferAttribute(col, 3),
+                   shade: new THREE.BufferAttribute(grey, 3) };
     ground = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
       vertexColors: true, side: THREE.DoubleSide,
       transparent: true, opacity: 0.72, depthWrite: false }));
     ground.renderOrder = -1;
     root.add(ground);
+    applyGround();
+  }
+
+  // ---------------------------------------------------------- basemaps
+  function mercator(lon, lat) {
+    var sn = Math.sin(lat * Math.PI / 180);
+    return [(lon + 180) / 360, 0.5 - Math.log((1 + sn) / (1 - sn)) / (4 * Math.PI)];
+  }
+
+  // The tile zoom that covers the region in at most about 160 tiles: what
+  // one person looking at one map would load, and no more.
+  function tileFrame() {
+    var lon1 = terr.min_lon + terr.nx * terr.step_lon;
+    var lat1 = terr.min_lat + terr.ny * terr.step_lat;
+    var a = mercator(terr.min_lon, lat1), b = mercator(lon1, terr.min_lat);
+    for (var z = 12; z >= 5; z--) {
+      var n = 1 << z;
+      var tx0 = Math.floor(a[0] * n), ty0 = Math.floor(a[1] * n);
+      var tx1 = Math.floor(b[0] * n), ty1 = Math.floor(b[1] * n);
+      if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) <= 160)
+        return { z: z, n: n, tx0: tx0, ty0: ty0, tx1: tx1, ty1: ty1,
+                 w: (tx1 - tx0 + 1) * 256, h: (ty1 - ty0 + 1) * 256 };
+    }
+  }
+
+  var groundTex = {};
+  function loadBasemap(mode) {
+    if (groundTex[mode]) return groundTex[mode];
+    var fr = tileFrame(), bm = BASEMAPS[mode];
+    var canvas = document.createElement("canvas");
+    canvas.width = fr.w; canvas.height = fr.h;
+    var ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#e9e4da"; ctx.fillRect(0, 0, fr.w, fr.h);
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.anisotropy = 4;
+    groundTex[mode] = tex;
+    // Each tile is painted as it arrives, so the ground fills in rather than
+    // appearing all at once after the last tile.
+    for (var ty = fr.ty0; ty <= fr.ty1; ty++) {
+      for (var tx = fr.tx0; tx <= fr.tx1; tx++) {
+        (function (tx, ty) {
+          var img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = function () {
+            ctx.drawImage(img, (tx - fr.tx0) * 256, (ty - fr.ty0) * 256);
+            tex.needsUpdate = true;
+          };
+          img.src = bm.url.replace("{z}", fr.z).replace("{x}", tx).replace("{y}", ty);
+        })(tx, ty);
+      }
+    }
+    return tex;
+  }
+
+  function applyGround() {
+    var credit = document.getElementById("credit");
+    if (credit) credit.innerHTML = (BASEMAPS[groundMode] || {}).credit || "";
+    if (!ground) return;
+    ground.visible = groundMode !== "off";
+    if (groundMode === "off") return;
+    var g = ground.geometry, m = ground.material;
+    if (groundMode === "relief") {
+      g.setAttribute("color", g.userData.ramp);
+      m.map = null; m.opacity = 0.72;
+    } else {
+      g.setAttribute("color", g.userData.shade);
+      m.map = loadBasemap(groundMode); m.opacity = 0.94;
+    }
+    m.needsUpdate = true;
   }
 
   // The survey grid, laid on the ground rather than floating over it. Each
@@ -855,7 +1028,8 @@ function gossansStrata() {
   function applyScale() { root.scale.set(1, 1, EXAG); }
 
   function applyVisible() {
-    if (ground) ground.visible = showGround;
+    if (ground) ground.visible = groundMode !== "off";
+    if (wellheads) wellheads.visible = true;
     if (gridLines) gridLines.visible = showGrid;
     tops.forEach(function (p) { p.visible = !hidden[p.userData.formation]; });
     lines.forEach(function (l) {
@@ -969,12 +1143,81 @@ function gossansStrata() {
       }
       place();
     });
+    host.addEventListener("pointermove", function (e) { if (!down) hover(e); });
+    host.addEventListener("pointerleave", function () {
+      var tip = document.getElementById("tip");
+      if (tip) tip.style.display = "none";
+    });
     addEventListener("pointerup", function () { down = null; });
     host.addEventListener("wheel", function (e) {
       e.preventDefault();
       dist *= e.deltaY > 0 ? 1.12 : 0.89;
       place();
     }, { passive: false });
+  }
+
+  // ---------------------------------------------------------- hover
+  // What is under the cursor, said in the page rather than drawn in the
+  // scene. Wellheads and tops are the only things worth naming; a ray is cast
+  // once per frame at most, and not while the view is being dragged.
+  var raycaster = new THREE.Raycaster(), mouse = new THREE.Vector2(), hoverQueued = false;
+  function hover(e) {
+    var r = host.getBoundingClientRect();
+    var px = e.clientX - r.left, py = e.clientY - r.top;
+    mouse.set((px / r.width) * 2 - 1, -(py / r.height) * 2 + 1);
+    if (hoverQueued) return;
+    hoverQueued = true;
+    requestAnimationFrame(function () { hoverQueued = false; pick(px, py); });
+  }
+
+  function formationsOf(wi) {
+    var W = data.wells, names = [];
+    if (W.prod[wi] >= 0) names.push(data.formations[W.prod[wi]].name);
+    (data.multi[String(wi)] || []).forEach(function (fi) {
+      var n = data.formations[fi].name;
+      if (names.indexOf(n) < 0) names.push(n);
+    });
+    return names;
+  }
+
+  function wellHtml(wi) {
+    var W = data.wells, ops = data.operators || [];
+    var forms = formationsOf(wi);
+    return "<b>" + (W.name[wi] || "unnamed") + "</b><br>" +
+      "<span class=\"m\">API " + W.api[wi] + (ops[W.op[wi]] ? " &middot; " + ops[W.op[wi]] : "") + "</span><br>" +
+      (forms.length ? "Completed in " + forms.join(", ") : "No producing formation filed") +
+      (forms.length > 1 ? " <span class=\"m\">(" + forms.length + " formations)</span>" : "") + "<br>" +
+      "<span class=\"m\">" + (topsPerWell && topsPerWell[wi]
+        ? topsPerWell[wi] + " tops drawn" : "no top with a usable elevation") + " &middot; " +
+      (hasPathArr && hasPathArr[wi] ? "directional survey on file" : "no survey; drawn vertical") + "<br>" +
+      "Ground " + Math.round(W.ground[wi]).toLocaleString() + " m, " +
+      (W.datum[wi] === 1 ? "from 3DEP" : "as filed") + "</span>";
+  }
+
+  function pick(px, py) {
+    var tip = document.getElementById("tip");
+    if (!tip || !data) return;
+    raycaster.setFromCamera(mouse, camera);
+    raycaster.params.Points.threshold = Math.max(40, dist * 0.005);
+    var targets = tops.filter(function (p) { return p.visible; });
+    if (wellheads) targets.push(wellheads);
+    var hits = raycaster.intersectObjects(targets, false);
+    if (!hits.length) { tip.style.display = "none"; return; }
+    var h = hits[0], ud = h.object.userData, html;
+    if (ud.heads) {
+      html = wellHtml(ud.wi[h.index]);
+    } else {
+      var f = data.formations[ud.formation], T = data.tops[ud.formation], ti = ud.ti[h.index];
+      html = "<b>" + f.name + "</b> <span class=\"m\">top</span><br>" +
+        T.d[ti].toLocaleString() + " ft filed depth &middot; " +
+        (T.z[ti] >= 0 ? "+" : "\u2212") + Math.abs(T.z[ti]).toLocaleString() + " m to sea level<br>" +
+        "<span class=\"m\">" + (data.wells.name[ud.wi[h.index]] || data.wells.api[ud.wi[h.index]]) + "</span>";
+    }
+    tip.innerHTML = html;
+    tip.style.display = "block";
+    var r = host.getBoundingClientRect();
+    tip.style.left = Math.min(px + 14, r.width - 260) + "px";
+    tip.style.top = Math.min(py + 14, r.height - 90) + "px";
   }
 
   function resize() {

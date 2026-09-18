@@ -42,6 +42,8 @@ BODY = r"""
            href="#mapview">Map</a>
         <a class="vs" role="tab" aria-selected="false" data-view="strata"
            href="#strata">Three dimensions</a>
+        <a class="vs" role="tab" aria-selected="false" data-view="surface"
+           href="#surface">Surface</a>
       </div>
       <div id="mapview" class="pane">
       <div class="ctl"><div class="ctlgrp" id="mapviews"></div></div>
@@ -305,6 +307,16 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       var v = window.gossansViews || {};
       if (wantMap && v.map) { v.map.invalidateSize(); }
       if (!wantMap && v.resize3d) { v.resize3d(); }
+      // The scene defines its preset hook only once its data has loaded;
+      // until then the wish is left for it to find.
+      if (!wantMap) {
+        if (v.preset3d) v.preset3d(which);
+        else { window.gossansViews = v; v.pendingPreset = which; }
+      }
+    }
+    function fromHash(){
+      return location.hash === "#strata" ? "strata"
+           : location.hash === "#surface" ? "surface" : "map";
     }
     tabs.forEach(function(t){
       t.addEventListener("click", function(e){
@@ -318,9 +330,9 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     });
     // /strata/ redirects here with #strata, and anything linking to the
     // scene does the same, so arrive on the view that was asked for.
-    show(location.hash === "#strata" ? "strata" : "map");
+    show(fromHash());
     addEventListener("hashchange", function(){
-      show(location.hash === "#strata" ? "strata" : "map");
+      show(fromHash());
     });
   }
 
