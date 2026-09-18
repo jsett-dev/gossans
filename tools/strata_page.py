@@ -69,6 +69,10 @@ PANE = r"""
       <div class="panel">
         <div id="wellcard" class="wellcard" hidden></div>
         <h3 class="withbtn">Wells <span id="wellcount" class="cnt"></span></h3>
+        <div class="findwell">
+          <input type="search" id="findwell" placeholder="find a well by name or API&hellip;" autocomplete="off">
+          <div id="findlist" class="findlist" hidden></div>
+        </div>
         <div class="filters" id="filters"></div>
         <h3>View</h3>
         <div class="ctlgrp" id="ctl"></div>
@@ -263,6 +267,15 @@ STYLE = r"""
 .lay3d select { font: inherit; font-size: 11px; border: 1px solid var(--rule);
   background: var(--paper); color: var(--ink); padding: 2px 4px; }
 .panel .cnt { font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--ink-3); }
+.findwell { position: relative; margin-bottom: 8px; }
+.findwell input { width: 100%; font: inherit; font-family: var(--f-data); font-size: 11.5px;
+  border: 1px solid var(--rule); background: var(--paper); color: var(--ink); padding: 5px 7px; }
+.findlist { position: absolute; left: 0; right: 0; top: 100%; z-index: 6; background: var(--paper);
+  border: 1px solid var(--rule); border-top: 0; max-height: 220px; overflow-y: auto;
+  font-family: var(--f-data); font-size: 11px; }
+.findlist div { padding: 4px 7px; cursor: pointer; border-top: 1px solid var(--rule); }
+.findlist div:hover { background: var(--paper-3); }
+.findlist .m { color: var(--ink-3); }
 .filters { font-family: var(--f-data); font-size: 11px; }
 .filters details { border-top: 1px solid var(--rule); padding: 4px 0; }
 .filters summary { cursor: pointer; color: var(--ink-2); letter-spacing: .08em;
@@ -316,29 +329,29 @@ function gossansStrata() {
   var groundMode = "relief", groundOpacity = 0.85, showGrid = true, showLabels = false;
   var heads = [], hasPathArr = null, topsPerWell = null, pendingPreset = null;
   var filt = null, isolated = -1, padSet = null, shownCount = 0;
-  var showContours = false;
+  var showContours = false, showLeases = false, leaseLines = null, leasesDoc = null;
   var hiddenNone = false, labels = [], combine = false;
   var data = null, surf = null, terr = null, plss = null, hidden = {};
   var renderer, scene, camera, root, tops = [], lines = [], meshes = [];
   var gridLines = null;
 
   Promise.all([
-    fetch("/data/strata.json").then(function (r) {
+    fetch(DATA + "/strata.json").then(function (r) {
       if (!r.ok) throw new Error(r.status); return r.json(); }),
     // The surfaces are optional. If they fail to load the measured view still
     // works, which is the right way round for a layer that is inference.
-    fetch("/data/surfaces.json").then(function (r) {
+    fetch(DATA + "/surfaces.json").then(function (r) {
       return r.ok ? r.json() : null; }).catch(function () { return null; }),
     // The ground and the survey grid are both optional in the same way: if
     // either fails the measured view still stands, which is the right way
     // round for context around the measurements.
-    fetch("/data/terrain.json").then(function (r) {
+    fetch(DATA + "/terrain.json").then(function (r) {
       return r.ok ? r.json() : null; }).catch(function () { return null; }),
     (function () {
       // Shared with the map on the same page, which wants the same megabyte.
       var g = window.gossansData = window.gossansData || {};
       if (!g.townships)
-        g.townships = fetch("/data/plss_townships.geojson")
+        g.townships = fetch(DATA + "/plss_townships.geojson")
           .then(function (r) { return r.ok ? r.json() : null; });
       return g.townships.catch(function () { return null; });
     })()
@@ -457,6 +470,46 @@ function gossansStrata() {
       if (v >= 0 && v < n) c[v]++;
     }
     return c;
+  }
+
+  // Find a well by name or API. The list narrows as you type; Enter takes
+  // the first, a click takes that one, and either isolates it.
+  function findWell() {
+    var inp = document.getElementById("findwell"), list = document.getElementById("findlist");
+    if (!inp || !list || !data) return;
+    var W = data.wells;
+    function matches(q) {
+      q = q.trim().toUpperCase();
+      if (q.length < 2) return [];
+      var out = [], digits = /^[0-9]+$/.test(q);
+      for (var i = 0; i < W.api.length && out.length < 12; i++) {
+        if (digits ? W.api[i].indexOf(q) >= 0 : (W.name[i] || "").toUpperCase().indexOf(q) >= 0) out.push(i);
+      }
+      return out;
+    }
+    function show(q) {
+      var hits = matches(q);
+      list.innerHTML = hits.map(function (i) {
+        return '<div data-wi="' + i + '"><b>' + (W.name[i] || "unnamed") + '</b> <span class="m">' + W.api[i] +
+               " &middot; " + (data.operators[W.op[i]] || "") + "</span></div>";
+      }).join("");
+      list.hidden = !hits.length;
+      list.querySelectorAll("div[data-wi]").forEach(function (d) {
+        d.addEventListener("mousedown", function (e) { e.preventDefault(); pickWell(+d.getAttribute("data-wi")); });
+      });
+      return hits;
+    }
+    function pickWell(wi) {
+      list.hidden = true; inp.value = W.name[wi] || W.api[wi];
+      if (groundMode === "relief" || groundMode === "off") { groundMode = "imagery"; layers(); applyGround(); }
+      isolate(wi);
+    }
+    inp.addEventListener("input", function () { show(inp.value); });
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { var h = matches(inp.value); if (h.length) pickWell(h[0]); }
+      if (e.key === "Escape") list.hidden = true;
+    });
+    inp.addEventListener("blur", function () { setTimeout(function () { list.hidden = true; }, 150); });
   }
 
   function filters() {
@@ -613,6 +666,8 @@ function gossansStrata() {
      set: function (v) { showLabels = v; }},
     {id: "cc", label: "Contours", get: function () { return showContours; },
      set: function (v) { showContours = v; if (terrain) terrain.setContours(v); }},
+    {id: "cfl", label: "Federal leases", get: function () { return showLeases; },
+     set: function (v) { showLeases = v; if (v) loadLeases(); applyVisible(); }},
     {id: "cf", label: "Interpolated surfaces", get: function () { return showSurfaces; },
      set: function (v) { showSurfaces = v; }}
   ];
@@ -667,6 +722,7 @@ function gossansStrata() {
   function build() {
     controls();
     filters();
+    findWell();
     renderer = new THREE.WebGLRenderer({ canvas: host, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     scene = new THREE.Scene();
@@ -912,6 +968,7 @@ function gossansStrata() {
     if (!terrain && terr) terrain = makeTerrain();
     if (terrain) root.add(terrain.group);
     if (gridLines) root.add(gridLines); else buildGrid();
+    if (leaseLines) root.add(leaseLines);
     if (mark) root.add(mark);
     if (terrain) terrain.redrape();
     drawLegend();
@@ -961,7 +1018,7 @@ function gossansStrata() {
   // screen. Each imagery tile is pinned to the terrain tile of the same
   // footprint, so photo and elevation cannot drift apart.
   var terrain = null;
-  var TILE_N = 49, Z_BASE = 9, Z_MAX = 19, SPLIT = 0.45, INFLIGHT = 6;
+  var TILE_N = 65, Z_BASE = 9, Z_MAX = 19, SPLIT = 0.45, INFLIGHT = 6;
 
   function makeTerrain() {
     var group = new THREE.Group(), tiles = {}, queue = [], inflight = 0;
@@ -1286,7 +1343,7 @@ function gossansStrata() {
         var N = TILE_N, sk = N * N;
         Object.keys(sides).forEach(function (side) {
           var nb = visibleLevelAt(t.z, sides[side][0], sides[side][1]);
-          var kdiff = nb === null ? 0 : Math.max(0, Math.min(4, t.z - nb));
+          var kdiff = nb === null ? 0 : Math.max(0, Math.min(6, t.z - nb));
           var idx = edgeIndices(side), step = 1 << kdiff;
           // Which slot of the skirt ring each edge vertex has: south row
           // first, then east, then north reversed, then west reversed.
@@ -1360,7 +1417,7 @@ function gossansStrata() {
       drapeTimer = setTimeout(function () { drapeTimer = null; redrape(); }, 400);
     }
     function redrape() {
-      [gridLines].concat(heads).forEach(function (obj) {
+      [gridLines, leaseLines].concat(heads).forEach(function (obj) {
         if (!obj || !obj.userData.xy) return;
         var xy = obj.userData.xy, p = obj.geometry.getAttribute("position"), lift = obj.userData.lift || 0;
         for (var i = 0; i < xy.length / 2; i++) {
@@ -1500,6 +1557,53 @@ function gossansStrata() {
     return [(lon + 180) / 360, 0.5 - Math.log((1 + sn) / (1 - sn)) / (4 * Math.PI)];
   }
 
+
+  // ------------------------------------------------------------ leases
+  // Authorised federal leases as outlines on the ground, copper for those
+  // held by production, slate for the rest. Fetched the first time asked.
+  function loadLeases() {
+    if (leasesDoc || !data) return;
+    leasesDoc = "loading";
+    fetch(DATA + "/leases.json").then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (doc) {
+        leasesDoc = doc;
+        if (!doc) return;
+        var m = metres(), pts = [], cols = [], STEP = 300;
+        doc.features.forEach(function (f) {
+          var held = /^Held/.test(f.properties.held || "");
+          var rgb = held ? [0.72, 0.33, 0.18] : [0.33, 0.38, 0.42];
+          f.geometry.coordinates.forEach(function (ring) {
+            var prev = null;
+            for (var i = 0; i < ring.length; i++) {
+              var x1 = (ring[i][0] - data.origin.lon) * m.lon, y1 = (ring[i][1] - data.origin.lat) * m.lat;
+              if (prev) {
+                var len = Math.sqrt((x1 - prev[0]) * (x1 - prev[0]) + (y1 - prev[1]) * (y1 - prev[1]));
+                var n = Math.max(1, Math.ceil(len / STEP)), last = null;
+                for (var k = 0; k <= n; k++) {
+                  var t = k / n, x = prev[0] + (x1 - prev[0]) * t, y = prev[1] + (y1 - prev[1]) * t;
+                  var z = terrainAt(x, y);
+                  if (z === null) { last = null; continue; }
+                  if (last) { pts.push(last[0], last[1], last[2], x, y, z + 0.4); cols.push(rgb[0], rgb[1], rgb[2], rgb[0], rgb[1], rgb[2]); }
+                  last = [x, y, z + 0.4];
+                }
+              }
+              prev = [x1, y1];
+            }
+          });
+        });
+        if (!pts.length) return;
+        var g = new THREE.BufferGeometry();
+        g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+        g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+        var xy = new Float32Array(pts.length / 3 * 2);
+        for (var q = 0; q < pts.length / 3; q++) { xy[q * 2] = pts[q * 3]; xy[q * 2 + 1] = pts[q * 3 + 1]; }
+        leaseLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
+        leaseLines.renderOrder = 2;
+        leaseLines.userData = { xy: xy, lift: 0.4 };
+        root.add(leaseLines);
+        applyVisible();
+      }).catch(function () { leasesDoc = null; });
+  }
 
   //: what the ground can wear, applied to every tile
   function applyGround() {
@@ -1766,6 +1870,7 @@ function gossansStrata() {
   function applyVisible() {
     heads.forEach(function (h) { h.visible = true; });
     if (terrain) { terrain.setContours(showContours); terrain.update(); }
+    if (leaseLines) leaseLines.visible = showLeases;
     if (gridLines) gridLines.visible = showGrid;
     tops.forEach(function (p) { p.visible = !hidden[p.userData.formation]; });
     lines.forEach(function (l) {

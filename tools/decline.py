@@ -94,12 +94,18 @@ def _sse_log(t, q, Di, b):
     return sse, math.exp(log_qi)
 
 
-def fit(t, q, b_bounds=(0.0, 2.0), di_bounds=(0.05, 5.0), rounds=6, nodes=40):
+def fit(t, q, b_bounds=(0.0, 2.0), di_bounds=(0.05, 5.0), rounds=8, nodes=16):
     """Fit an Arps curve to (t years, rate) pairs.
 
     Returns a dict with qi, Di, b, the three decline bases, r2 on log rate and
     a flag when b lands on a bound, which means the search hit a wall rather
     than found an answer.
+
+    The search is a grid that narrows on its incumbent each round. It was 6
+    rounds of 41 by 41 - ten thousand evaluations a well, 1.7 seconds in pure
+    Python, eight hours for a basin. Eight rounds of 17 by 17 reach a finer
+    final window in a quarter of the evaluations, because each round halves
+    the span around the incumbent twice over.
     """
     pairs = [(ti, qq) for ti, qq in zip(t, q) if qq is not None and qq > 0]
     if len(pairs) < 4:

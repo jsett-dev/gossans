@@ -97,7 +97,7 @@ SCRIPT = r"""
 (function () {
   var el = function (id) { return document.getElementById(id); };
   if (!el("tables")) return;
-  fetch("/data/inventory.json").then(function (r) { return r.json(); }).then(function (d) {
+  fetch(DATA + "/inventory.json").then(function (r) { return r.json(); }).then(function (d) {
     var n = function (v) { return v.toLocaleString(); };
 
     var t = el("tables").querySelector("tbody");

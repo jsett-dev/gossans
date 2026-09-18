@@ -63,6 +63,8 @@ BODY = r"""
             <i class="sw model"></i> Township model</label>
           <label><input id="lay-contour" type="checkbox">
             <i class="sw" style="border-color:#6b6b6b"></i> Contours (50 m)</label>
+          <label><input id="lay-lease" type="checkbox">
+            <i class="sw" style="border-color:#b7532e"></i> Federal leases</label>
           <p class="zoomhint" id="zoomhint"></p>
           <h3>Township model</h3>
           <div class="ctlgrp" id="views"></div>
@@ -351,7 +353,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
   function townshipsGeoJSON(){
     var g = window.gossansData = window.gossansData || {};
     if (!g.townships)
-      g.townships = fetch("/data/plss_townships.geojson")
+      g.townships = fetch(DATA + "/plss_townships.geojson")
         .then(function(r){ return r.ok ? r.json() : null; });
     return g.townships;
   }
@@ -381,6 +383,12 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       return t + " " + r;
     }
     (data.cells || []).forEach(function(c){ cellBy[tkey(c.twp, c.rge)] = c; });
+    window.gossansViews = window.gossansViews || {};
+    window.gossansViews.townships = function(){
+      var out = [];
+      groups.twp.eachLayer(function(gl){ gl.eachLayer && gl.eachLayer(function(l){ out.push(l); }); });
+      return out;
+    };
 
     townshipsGeoJSON().then(function(g){
         if (!g) return;
@@ -398,7 +406,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
 
     // Which townships are on screen, from the township file we already have.
     var twpIndex = [];
-    fetch("/data/plss/index.json").then(function(r){return r.json();})
+    fetch(DATA + "/plss/index.json").then(function(r){return r.json();})
       .then(function(ix){ twpIndex = Object.keys(ix); refresh(); }).catch(function(){});
 
     function wantedIds(){
@@ -416,8 +424,8 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       var key = kind + id;
       if (loaded[key]) return;
       loaded[key] = true;
-      var url = kind === "sec" ? "/data/plss/sec_" + id + ".geojson"
-                               : "/data/plss/" + id + ".geojson";
+      var url = kind === "sec" ? DATA + "/plss/sec_" + id + ".geojson"
+                               : DATA + "/plss/" + id + ".geojson";
       fetch(url).then(function(r){ return r.ok ? r.json() : null; })
         .then(function(g){
           if (!g) return;
@@ -467,13 +475,34 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     bind("lay-sma", sma);
     bind("lay-model", groups.model);
     // Contours are a megabyte or two and are fetched the first time asked for.
+    groups.lease = L.layerGroup();
+    var leasesLoaded = false;
+    bind("lay-lease", groups.lease);
+    document.getElementById("lay-lease").addEventListener("change", function(e){
+      if (!e.target.checked || leasesLoaded) return;
+      leasesLoaded = true;
+      fetch(DATA + "/leases.json").then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(g){
+          if (!g) return;
+          L.geoJSON(g, {style: function(f){
+            var held = /^Held/.test(f.properties.held || "");
+            return {color: held ? "#b7532e" : "#54606b", weight: 0.9, fill: true,
+                    fillColor: held ? "#b7532e" : "#54606b", fillOpacity: held ? 0.18 : 0.06, opacity: 0.8};
+          }, onEachFeature: function(f, l){
+            var p = f.properties;
+            l.bindTooltip((p.held || "not held") + " &middot; " + p.serial +
+              (p.acres ? " &middot; " + p.acres.toLocaleString() + " ac" : "") +
+              (p.from ? " &middot; from " + p.from : ""), {sticky:true});
+          }}).addTo(groups.lease);
+        }).catch(function(){});
+    });
     groups.contour = L.layerGroup();
     var contoursLoaded = false;
     bind("lay-contour", groups.contour);
     document.getElementById("lay-contour").addEventListener("change", function(e){
       if (!e.target.checked || contoursLoaded) return;
       contoursLoaded = true;
-      fetch("/data/contours.json").then(function(r){ return r.ok ? r.json() : null; })
+      fetch(DATA + "/contours.json").then(function(r){ return r.ok ? r.json() : null; })
         .then(function(g){
           if (!g) return;
           L.geoJSON(g, {style: function(f){
@@ -527,10 +556,16 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
 
   // ------------------------------------------------------------ the map
   var MAPVIEWS = [
-    {k:"perft", label:"Recovery per 1,000 ft", unit:"bbl"},
-    {k:"eur",   label:"Recovery per well",     unit:"bbl"},
-    {k:"none",  label:"Just the wells",        unit:""}
+    {k:"perft", label:"Oil per 1,000 ft", unit:"bbl"},
+    {k:"eur",   label:"Oil per well",     unit:"bbl"},
+    {k:"geur",  label:"Gas per well",     unit:"mcf"},
+    {k:"none",  label:"Just the wells",   unit:""}
   ];
+  // Which fit a view is about: the gas view judges the gas fit.
+  function fitOf(p){
+    if (mapView.k === "geur") return p.gfit || "none";
+    return p.fit || (p.sound ? "sound" : "refused");
+  }
   var mapView = MAPVIEWS[0], lmap = null, layer = null, wellData = null;
 
   function startMap(){
@@ -549,16 +584,51 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       attribution: 'Basemap &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. ' +
                    'Wells: Wyoming Oil and Gas Conservation Commission.'
     }).addTo(lmap);
-    fetch("/data/wells.geojson").then(function(r){ return r.json(); })
-      .then(function(gj){ wellData = gj; mapControls(); paintMap(); })
+    fetch(DATA + "/wells.geojson").then(function(r){ return r.json(); })
+      .then(function(gj){ overview = gj; wellData = merged(); mapControls(); paintMap(); })
       .catch(function(e){
         document.getElementById("maplegend").textContent =
           "Could not load the well locations: " + e;
       });
+    lmap.on("moveend zoomend", wellsInView);
   }
 
-  function paintMap(){
+  // Every well, township by township, for the townships on screen. The
+  // overview holds only the wells with a sound fit; the rest arrive with
+  // their township once the map is close enough to tell townships apart.
+  var overview = null, twpWells = {}, twpLoading = {};
+  var WELLS_ZOOM = 9;
+  function merged(){
+    if (!overview) return null;
+    var seen = {}, feats = [];
+    Object.keys(twpWells).forEach(function(k){
+      twpWells[k].forEach(function(f){ seen[f.properties.api] = 1; feats.push(f); });
+    });
+    overview.features.forEach(function(f){ if (!seen[f.properties.api]) feats.push(f); });
+    return {type:"FeatureCollection", features: feats};
+  }
+  function wellsInView(){
+    if (!lmap || lmap.getZoom() < WELLS_ZOOM || !overview) return;
+    var b = lmap.getBounds(), wanted = [];
+    window.gossansViews.townships().forEach(function(l){
+      if (l.getBounds && b.intersects(l.getBounds()) && l.feature)
+        wanted.push(l.feature.properties.label.replace(" ", "_"));
+    });
+    var pending = 0;
+    wanted.forEach(function(k){
+      if (twpWells[k] || twpLoading[k]) return;
+      twpLoading[k] = true; pending++;
+      fetch(DATA + "/wells/" + k + ".geojson").then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(g){
+          twpWells[k] = g ? g.features : [];
+          if (--pending === 0) { wellData = merged(); paintMap(false); }
+        }).catch(function(){ twpWells[k] = []; if (--pending === 0) { wellData = merged(); paintMap(false); } });
+    });
+  }
+
+  function paintMap(fit){
     if (!wellData || !lmap) return;
+    if (fit === undefined) fit = true;
     if (layer) lmap.removeLayer(layer);
 
     var vals = wellData.features
@@ -581,7 +651,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       // well we cannot normalise because its perforated interval was never
       // filed. Calling any of these "refused" would be the same lie the grid
       // used to tell.
-      var fit = p.fit || (p.sound ? "sound" : "refused");
+      var fit = fitOf(p);
       if (mapView.k === "none") {
         style = {radius:3.5, color:"#6f7472", weight:1, fill:false, opacity:0.8};
       } else if (fit === "none") {
@@ -589,7 +659,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       } else if (fit === "refused") {
         style = {radius:3, color:"#b0574a", weight:1.1, fill:false,
                  opacity:0.75, dashArray:"2,2"};
-      } else if (!v) {
+      } else if (fit !== "sound" || !v) {
         style = {radius:3, color:"#8a8f8c", weight:1, fill:false, opacity:0.6};
       } else {
         var t = Math.max(0, Math.min(1, (v-lo)/((hi-lo)||1)));
@@ -603,24 +673,32 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
         (p.trs ? p.trs + " &middot; " : "") + (p.co ? p.co + " County" : "") + "<br>" +
         (p.fm ? "Producing from " + p.fm + "<br>" : "") +
         (p.sound
-          ? ((p.eur ? "Recovery " + p.eur.toLocaleString() + " bbl<br>" : "") +
+          ? ((p.eur ? "Oil recovery " + p.eur.toLocaleString() + " bbl<br>" : "") +
              (p.perft ? p.perft.toLocaleString() + " bbl per 1,000 ft<br>" : ""))
-          : (fit === "none"
+          : ((p.fit || "none") === "none"
              ? "<i>No oil history to fit.</i><br>"
-             : "<i>Fit refused. No recovery number is claimed for this well.</i><br>")) +
+             : "<i>Oil fit refused. No oil recovery is claimed for this well.</i><br>")) +
+        (p.gfit === "sound" && p.geur
+          ? "Gas recovery " + p.geur.toLocaleString() + " mcf<br>"
+          : (p.gfit === "refused" ? "<i>Gas fit refused.</i><br>" : "")) +
         "<span style='color:#777'>API " + p.api + "</span>");
       layer.addLayer(m);
     });
     layer.addTo(lmap); sinkModel();
 
-    var pts = wellData.features.map(function(f){
-      return [f.geometry.coordinates[1], f.geometry.coordinates[0]]; });
-    if (pts.length) lmap.fitBounds(pts, {padding:[20,20]});
+    if (fit) {
+      var pts = wellData.features.map(function(f){
+        return [f.geometry.coordinates[1], f.geometry.coordinates[0]]; });
+      if (pts.length) lmap.fitBounds(pts, {padding:[20,20]});
+    }
 
     var L2 = document.getElementById("maplegend");
+    var zoomNote = (lmap.getZoom() < WELLS_ZOOM)
+      ? '<span style="color:var(--ink-3)">Only wells with a sound fit are drawn this far out; zoom in for every well.</span>'
+      : "";
     if (mapView.k === "none") {
       L2.innerHTML = '<span>' + wellData.features.length.toLocaleString() +
-        ' wells, all drawn the same</span>';
+        ' wells, all drawn the same</span>' + zoomNote;
     } else {
       var parts = [];
       for (var i=0;i<5;i++){
@@ -628,18 +706,16 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
         parts.push('<span><i class="sw" style="border-radius:50%;width:12px;'+
           'background:'+shade(t)+'"></i>'+Math.round(v).toLocaleString()+'</span>');
       }
-      var refused = wellData.features.filter(function(f){
-        return (f.properties.fit || (f.properties.sound ? "sound" : "refused")) === "refused"; }).length;
-      var unfitted = wellData.features.filter(function(f){
-        return f.properties.fit === "none"; }).length;
+      var refused = wellData.features.filter(function(f){ return fitOf(f.properties) === "refused"; }).length;
+      var unfitted = wellData.features.filter(function(f){ return fitOf(f.properties) === "none"; }).length;
       var nomeasure = wellData.features.filter(function(f){
-        return f.properties.sound && !f.properties[mapView.k]; }).length;
+        return fitOf(f.properties) === "sound" && !f.properties[mapView.k]; }).length;
       parts.push('<span><i class="sw" style="border-radius:50%;width:12px;'+
         'background:transparent;border:1px dashed #b0574a"></i>fit refused ('+
         refused.toLocaleString()+')</span>');
       if (unfitted) {
         parts.push('<span><i class="sw" style="border-radius:50%;width:12px;'+
-          'background:transparent;border-color:#9aa0a6"></i>no oil history to fit ('+
+          'background:transparent;border-color:#9aa0a6"></i>no '+(mapView.k === "geur" ? "gas" : "oil")+' history to fit ('+
           unfitted.toLocaleString()+')</span>');
       }
       if (nomeasure) {
@@ -650,7 +726,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
           nomeasure.toLocaleString()+')</span>');
       }
       parts.push('<span style="color:var(--ink-3)">'+mapView.unit+'</span>');
-      L2.innerHTML = parts.join("");
+      L2.innerHTML = parts.join("") + zoomNote;
     }
   }
 
@@ -667,7 +743,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     });
   }
 
-  fetch("/data/basin.json").then(function(r){ return r.json(); }).then(function(j){
+  fetch(DATA + "/basin.json").then(function(r){ return r.json(); }).then(function(j){
     data=j;
     $("hdr").innerHTML = j.wells_total.toLocaleString()+" wells &middot; "+
       j.months.toLocaleString()+" production months &middot; "+

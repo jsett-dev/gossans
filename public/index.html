@@ -1316,6 +1316,8 @@ convert tail to gas lift      cost <b>$2.4M</b>   risked <b>&minus;$2.4M</b>   w
 </div>
 
 <script>
+var DATA = window.GOSSANS_DATA || "/data";
+
 (function () {
   var btn = document.getElementById("theme");
   if (!btn) return;
@@ -1335,7 +1337,7 @@ convert tail to gas lift      cost <b>$2.4M</b>   risked <b>&minus;$2.4M</b>   w
 // says what is held today rather than what was held when it was written.
 // The numbers in the markup are the fallback if the inventory cannot load.
 (function () {
-  fetch("/data/inventory.json").then(function (r) { return r.json(); }).then(function (d) {
+  fetch(DATA + "/inventory.json").then(function (r) { return r.json(); }).then(function (d) {
     var rows = {};
     (d.tables || []).forEach(function (t) { rows[t.table] = t.rows; });
     rows.wells = d.wells;

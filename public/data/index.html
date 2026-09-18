@@ -940,7 +940,7 @@ header.plate { padding: 40px 0 0; }
 (function () {
   var el = function (id) { return document.getElementById(id); };
   if (!el("tables")) return;
-  fetch("/data/inventory.json").then(function (r) { return r.json(); }).then(function (d) {
+  fetch(DATA + "/inventory.json").then(function (r) { return r.json(); }).then(function (d) {
     var n = function (v) { return v.toLocaleString(); };
 
     var t = el("tables").querySelector("tbody");
@@ -1015,6 +1015,8 @@ header.plate { padding: 40px 0 0; }
 </div>
 
 <script>
+var DATA = window.GOSSANS_DATA || "/data";
+
 (function () {
   var btn = document.getElementById("theme");
   if (!btn) return;
