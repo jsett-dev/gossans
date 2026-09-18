@@ -315,12 +315,12 @@ function gossansStrata() {
   var EXAG = 15, showPaths = true, onlySurveyed = false, showSurfaces = false;
   var groundMode = "relief", groundOpacity = 0.85, showGrid = true, showLabels = false;
   var heads = [], hasPathArr = null, topsPerWell = null, pendingPreset = null;
-  var filt = null, isolated = -1, padSet = null, patch = null, shownCount = 0;
-  var showContours = false, contourLines = null, contoursDoc = null, padContours = null;
+  var filt = null, isolated = -1, padSet = null, shownCount = 0;
+  var showContours = false;
   var hiddenNone = false, labels = [], combine = false;
   var data = null, surf = null, terr = null, plss = null, hidden = {};
   var renderer, scene, camera, root, tops = [], lines = [], meshes = [];
-  var ground = null, gridLines = null;
+  var gridLines = null;
 
   Promise.all([
     fetch("/data/strata.json").then(function (r) {
@@ -594,7 +594,7 @@ function gossansStrata() {
             return '<li><a data-wi="' + p + '">' + (W.name[p] || W.api[p]) + "</a> <span class=\"m\">" + data.types[W.type[p]] + "</span></li>";
           }).join("") + (pad.length > 13 ? "<li class=\"m\">and " + (pad.length - 13) + " more</li>" : "") + "</ul>"
         : "<span class=\"m\">No other well within 250 m.</span><br>") +
-      '<span class="m gnote">Ground here is the ' + Math.round(terr ? terr.step_m : 0) + " m grid until the one-metre model answers for this view.</span>" +
+      '<span class="m gnote">Ground refines toward the camera from the one-metre model; the imagery is pinned to it tile by tile.</span>' +
       '<div class="act"><button type="button" id="w-all">Show all wells</button></div>';
     card.hidden = false;
     card.querySelectorAll("a[data-wi]").forEach(function (a) {
@@ -612,7 +612,7 @@ function gossansStrata() {
     {id: "cl", label: "Formation labels", get: function () { return showLabels; },
      set: function (v) { showLabels = v; }},
     {id: "cc", label: "Contours", get: function () { return showContours; },
-     set: function (v) { showContours = v; if (v) loadContours(); }},
+     set: function (v) { showContours = v; if (terrain) terrain.setContours(v); }},
     {id: "cf", label: "Interpolated surfaces", get: function () { return showSurfaces; },
      set: function (v) { showSurfaces = v; }}
   ];
@@ -622,13 +622,13 @@ function gossansStrata() {
   var BASEMAPS = {
     off:     {label: "Off"},
     relief:  {label: "Shaded relief (3DEP)", credit: "Relief: USGS 3DEP"},
-    osm:     {label: "OpenStreetMap",
+    osm:     {label: "OpenStreetMap", zmax: 19,
               url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
               credit: "&copy; OpenStreetMap contributors"},
-    imagery: {label: "Aerial (USGS)",
+    imagery: {label: "Aerial (USGS)", zmax: 16,
               url: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}",
               credit: "Imagery: USDA, USGS The National Map"},
-    topo:    {label: "Topographic (USGS)",
+    topo:    {label: "Topographic (USGS)", zmax: 16,
               url: "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}",
               credit: "USGS The National Map: Topo"}
   };
@@ -851,7 +851,9 @@ function gossansStrata() {
       var pts = new THREE.Points(hg, new THREE.PointsMaterial({
         map: symbol(+ty).tex, size: 10, sizeAttenuation: false,
         transparent: true, alphaTest: 0.04, depthWrite: false }));
-      pts.userData = { heads: true, wi: byType[ty].wi, type: +ty };
+      var hxy = new Float32Array(byType[ty].wi.length * 2);
+      for (var hq = 0; hq < byType[ty].wi.length; hq++) { hxy[hq * 2] = byType[ty].p[hq * 3]; hxy[hq * 2 + 1] = byType[ty].p[hq * 3 + 1]; }
+      pts.userData = { heads: true, wi: byType[ty].wi, type: +ty, xy: hxy, lift: 0 };
       pts.renderOrder = 2; heads.push(pts); root.add(pts);
     });
     sizeHeads();
@@ -907,12 +909,11 @@ function gossansStrata() {
     // The ground and the grid cost real time to build and do not depend on
     // any of the switches that cause a rebuild, so they are built once and
     // put back afterwards.
-    if (ground) root.add(ground); else buildGround();
+    if (!terrain && terr) terrain = makeTerrain();
+    if (terrain) root.add(terrain.group);
     if (gridLines) root.add(gridLines); else buildGrid();
-    if (patch) root.add(patch);
-    if (contourLines) root.add(contourLines);
-    if (padContours) root.add(padContours);
     if (mark) root.add(mark);
+    if (terrain) terrain.redrape();
     drawLegend();
     applyScale();
     applyVisible();
@@ -931,10 +932,10 @@ function gossansStrata() {
              lon: 111320.0 * Math.cos(data.origin.lat * Math.PI / 180) };
   }
 
-  function terrainAt(x, y) {
+  // The 800 m grid, sampled by longitude and latitude. It is the base level
+  // of the pyramid and the answer wherever no finer tile has arrived.
+  function coarseAt(lon, lat) {
     if (!terr) return null;
-    var m = metres();
-    var lon = data.origin.lon + x / m.lon, lat = data.origin.lat + y / m.lat;
     var fx = (lon - terr.min_lon) / terr.step_lon - 0.5;
     var fy = (lat - terr.min_lat) / terr.step_lat - 0.5;
     var ix = Math.floor(fx), iy = Math.floor(fy);
@@ -943,136 +944,393 @@ function gossansStrata() {
     var a = terr.z[iy * terr.nx + ix], b = terr.z[iy * terr.nx + ix + 1],
         c = terr.z[(iy + 1) * terr.nx + ix], d = terr.z[(iy + 1) * terr.nx + ix + 1];
     if (a === null || b === null || c === null || d === null) return null;
-    // The cell is drawn as triangles (a, c, b) and (b, c, d), split along
-    // the b-c diagonal; the height is taken from whichever the point is in.
-    if (tx + ty <= 1) return a + (b - a) * tx + (c - a) * ty;
-    return d + (c - d) * (1 - tx) + (b - d) * (1 - ty);
+    return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
   }
 
-  function buildGround() {
-    if (!terr) return;
-    var nx = terr.nx, ny = terr.ny, m = metres();
-    var pos = new Float32Array(nx * ny * 3), col = new Float32Array(nx * ny * 3);
-    var lo = Infinity, hi = -Infinity, i, j, k;
-    for (i = 0; i < terr.z.length; i++) {
-      var v = terr.z[i];
-      if (v === null) continue;
-      if (v < lo) lo = v;
-      if (v > hi) hi = v;
+  // Height of the ground as drawn, at a scene point: the finest tile there.
+  function terrainAt(x, y) {
+    if (terrain) return terrain.at(x, y);
+    var m = metres();
+    return coarseAt(data.origin.lon + x / m.lon, data.origin.lat + y / m.lat);
+  }
+
+  // One elevation model, cut into a quadtree of web-mercator tiles that
+  // refine toward the camera. The base level is cut from the grid on the
+  // page; every finer level is fetched from the one-metre model for exactly
+  // the tile's footprint, and a tile splits into four when it grows large on
+  // screen. Each imagery tile is pinned to the terrain tile of the same
+  // footprint, so photo and elevation cannot drift apart.
+  var terrain = null;
+  var TILE_N = 48, Z_BASE = 9, Z_MAX = 19, SPLIT = 0.45, INFLIGHT = 6;
+
+  function makeTerrain() {
+    var group = new THREE.Group(), tiles = {}, queue = [], inflight = 0;
+    var m = metres(), frustum = new THREE.Frustum(), pm = new THREE.Matrix4();
+    var base = [], pending = false, drapeTimer = null;
+    var loader = new THREE.TextureLoader();
+    loader.setCrossOrigin("anonymous");
+
+    function key(z, x, y) { return z + "/" + x + "/" + y; }
+    function bounds(z, x, y) {
+      var n = 1 << z;
+      var lat = function (yy) { return Math.atan(Math.sinh(Math.PI * (1 - 2 * yy / n))) * 180 / Math.PI; };
+      return { lon0: x / n * 360 - 180, lon1: (x + 1) / n * 360 - 180, lat0: lat(y + 1), lat1: lat(y) };
     }
-    for (j = 0; j < ny; j++) {
-      for (i = 0; i < nx; i++) {
-        k = j * nx + i;
-        var lon = terr.min_lon + (i + 0.5) * terr.step_lon;
-        var lat = terr.min_lat + (j + 0.5) * terr.step_lat;
-        var z = terr.z[k];
-        pos[k * 3] = (lon - data.origin.lon) * m.lon;
-        pos[k * 3 + 1] = (lat - data.origin.lat) * m.lat;
-        pos[k * 3 + 2] = (z === null ? lo : z);
-      }
+    function intervalFor(z) {
+      return z <= 9 ? 100 : z <= 10 ? 50 : z <= 12 ? 20 : z <= 14 ? 10 : z <= 16 ? 5 : z <= 17 ? 2 : 1;
     }
-    // No lights in this scene, so the relief is shaded here: a slope term from
-    // the neighbouring cells, lit from the north-west the way a map is.
-    var grey = new Float32Array(nx * ny * 3), uv = new Float32Array(nx * ny * 2);
-    var fr = tileFrame();
-    for (j = 0; j < ny; j++) {
-      for (i = 0; i < nx; i++) {
-        k = j * nx + i;
-        var lon = terr.min_lon + (i + 0.5) * terr.step_lon;
-        var lat = terr.min_lat + (j + 0.5) * terr.step_lat;
-        var xw = pos[(j * nx + Math.max(0, i - 1)) * 3 + 2];
-        var xe = pos[(j * nx + Math.min(nx - 1, i + 1)) * 3 + 2];
-        var ys = pos[(Math.max(0, j - 1) * nx + i) * 3 + 2];
-        var yn = pos[(Math.min(ny - 1, j + 1) * nx + i) * 3 + 2];
-        var d = terr.step_m * 2;
-        var nxv = -(xe - xw) / d, nyv = -(yn - ys) / d, nz = 1;
-        var len = Math.sqrt(nxv * nxv + nyv * nyv + nz * nz);
-        var lit = (nxv * -0.55 + nyv * 0.55 + nz * 0.63) / len;
-        var shade = 0.55 + 0.45 * Math.max(0, lit);
-        var t = (hi === lo) ? 0.5 : (pos[k * 3 + 2] - lo) / (hi - lo);
-        // Sandstone in the low ground, slate on the high, both muted so the
-        // measurements stay the brightest thing on the screen.
-        col[k * 3]     = (0.85 - 0.30 * t) * shade;
-        col[k * 3 + 1] = (0.77 - 0.24 * t) * shade;
-        col[k * 3 + 2] = (0.63 - 0.06 * t) * shade;
-        // A basemap gets the relief as a grey multiplier, lighter than the
-        // ramp so the imagery keeps its own colour.
+
+    function makeTile(z, x, y, parent) {
+      var b = bounds(z, x, y), k = key(z, x, y);
+      var t = { z: z, x: x, y: y, key: k, b: b, parent: parent, children: null,
+                state: "empty", node: null, dem: null, zmin: 0, zmax: 3000,
+                cx: ((b.lon0 + b.lon1) / 2 - data.origin.lon) * m.lon,
+                cy: ((b.lat0 + b.lat1) / 2 - data.origin.lat) * m.lat,
+                size: (b.lon1 - b.lon0) * m.lon, tex: {}, used: 0 };
+      if (parent) { t.zmin = parent.zmin; t.zmax = parent.zmax; }
+      tiles[k] = t;
+      return t;
+    }
+
+    // ---- geometry from a tile's own DEM, rows south to north
+    function buildTile(t, dem) {
+      var N = TILE_N, b = t.b, dlon = (b.lon1 - b.lon0) / N, dlat = (b.lat1 - b.lat0) / N;
+      var cell = t.size / N;
+      var lo = Infinity, hi = -Infinity, i, j, k;
+      for (k = 0; k < dem.length; k++) { var v = dem[k]; if (!isNaN(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } }
+      if (!(hi >= lo)) return false;
+      var skirt = 4 * N, nv = N * N + skirt;
+      var pos = new Float32Array(nv * 3), ramp = new Float32Array(nv * 3), grey = new Float32Array(nv * 3), uv = new Float32Array(nv * 2);
+      var glo = terr ? 900 : lo, ghi = terr ? 2800 : hi;
+      for (j = 0; j < N; j++) for (i = 0; i < N; i++) {
+        k = j * N + i;
+        var lon = b.lon0 + (i + 0.5) * dlon, lat = b.lat0 + (j + 0.5) * dlat;
+        var z = dem[k]; if (isNaN(z)) z = lo;
+        pos[k * 3] = (lon - data.origin.lon) * m.lon; pos[k * 3 + 1] = (lat - data.origin.lat) * m.lat; pos[k * 3 + 2] = z;
+        var mc = mercator(lon, lat), n = 1 << t.z;
+        uv[k * 2] = mc[0] * n - t.x; uv[k * 2 + 1] = 1 - (mc[1] * n - t.y);
+        var xw = dem[j * N + Math.max(0, i - 1)], xe = dem[j * N + Math.min(N - 1, i + 1)];
+        var ys = dem[Math.max(0, j - 1) * N + i], yn = dem[Math.min(N - 1, j + 1) * N + i];
+        if (isNaN(xw)) xw = z; if (isNaN(xe)) xe = z; if (isNaN(ys)) ys = z; if (isNaN(yn)) yn = z;
+        var d = cell * 2, nxv = -(xe - xw) / d, nyv = -(yn - ys) / d, len = Math.sqrt(nxv * nxv + nyv * nyv + 1);
+        var lit = (nxv * -0.55 + nyv * 0.55 + 0.63) / len, shade = 0.55 + 0.45 * Math.max(0, lit);
+        var tt = Math.max(0, Math.min(1, (z - glo) / (ghi - glo)));
+        ramp[k * 3] = (0.85 - 0.30 * tt) * shade; ramp[k * 3 + 1] = (0.77 - 0.24 * tt) * shade; ramp[k * 3 + 2] = (0.63 - 0.06 * tt) * shade;
         var g2 = 0.72 + 0.28 * Math.max(0, lit);
         grey[k * 3] = grey[k * 3 + 1] = grey[k * 3 + 2] = g2;
-        // Where this vertex sits on a web-mercator tile canvas of the
-        // region, so any tile basemap drapes exactly despite the grid
-        // being geographic and the tiles not.
-        var mc = mercator(lon, lat);
-        uv[k * 2] = (mc[0] * fr.n * 256 - fr.tx0 * 256) / fr.w;
-        uv[k * 2 + 1] = 1 - (mc[1] * fr.n * 256 - fr.ty0 * 256) / fr.h;
       }
-    }
-    var idx = new Uint32Array((nx - 1) * (ny - 1) * 6), p = 0;
-    for (j = 0; j < ny - 1; j++) {
-      for (i = 0; i < nx - 1; i++) {
-        var a = j * nx + i, b = a + 1, c = a + nx, d2 = c + 1;
-        idx[p++] = a; idx[p++] = c; idx[p++] = b;
-        idx[p++] = b; idx[p++] = c; idx[p++] = d2;
+      // Skirts: the edge ring again, dropped, so neighbouring tiles at a
+      // different level do not show a crack of sky between them.
+      var drop = Math.max(6, cell * 3), sk = N * N, edges = [];
+      for (i = 0; i < N; i++) edges.push(i);                       // south row
+      for (j = 0; j < N; j++) edges.push(j * N + N - 1);           // east column
+      for (i = N - 1; i >= 0; i--) edges.push((N - 1) * N + i);    // north row
+      for (j = N - 1; j >= 0; j--) edges.push(j * N);              // west column
+      for (k = 0; k < skirt; k++) {
+        var src = edges[k], dst = sk + k;
+        pos[dst * 3] = pos[src * 3]; pos[dst * 3 + 1] = pos[src * 3 + 1]; pos[dst * 3 + 2] = pos[src * 3 + 2] - drop;
+        for (var c3 = 0; c3 < 3; c3++) { ramp[dst * 3 + c3] = ramp[src * 3 + c3] * 0.8; grey[dst * 3 + c3] = grey[src * 3 + c3] * 0.8; }
+        uv[dst * 2] = uv[src * 2]; uv[dst * 2 + 1] = uv[src * 2 + 1];
       }
+      var idx = [];
+      for (j = 0; j < N - 1; j++) for (i = 0; i < N - 1; i++) {
+        var q = j * N + i;
+        idx.push(q, q + N, q + 1, q + 1, q + N, q + N + 1);
+      }
+      for (k = 0; k < skirt; k++) {
+        var e0 = edges[k], e1 = edges[(k + 1) % skirt], s0 = sk + k, s1 = sk + (k + 1) % skirt;
+        idx.push(e0, s0, e1, e1, s0, s1);
+      }
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      g.userData = { ramp: new THREE.BufferAttribute(ramp, 3), grey: new THREE.BufferAttribute(grey, 3), uv0: uv };
+      g.setAttribute("color", g.userData.ramp);
+      var mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+        vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: groundOpacity,
+        depthWrite: true, polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }));
+      mesh.renderOrder = 0;
+      var node = new THREE.Group();
+      node.add(mesh);
+      node.userData = { mesh: mesh, lines: null };
+      t.dem = dem; t.zmin = lo; t.zmax = hi; t.node = node; t.state = "ready";
+      node.visible = false;
+      group.add(node);
+      buildContours(t);
+      applyMode(t);
+      scheduleDrape();
+      return true;
     }
-    var g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
-    g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
-    g.setIndex(new THREE.BufferAttribute(idx, 1));
-    g.userData = { ramp: new THREE.BufferAttribute(col, 3),
-                   shade: new THREE.BufferAttribute(grey, 3) };
-    ground = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
-      vertexColors: true, side: THREE.DoubleSide,
-      transparent: true, opacity: groundOpacity, depthWrite: true,
-      polygonOffset: true, polygonOffsetFactor: 2, polygonOffsetUnits: 2 }));
-    ground.renderOrder = 0;
-    root.add(ground);
-    applyGround();
-  }
 
-  // ---------------------------------------------------------- contours
-  // Region contours, from the file, at their own height. Index contours
-  // (every fifth) are drawn darker; the rest are faint.
-  function loadContours() {
-    if (contoursDoc || !data) return;
-    contoursDoc = "loading";
-    fetch("/data/contours.json").then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (doc) {
-        contoursDoc = doc;
-        if (!doc) return;
-        var m = metres(), pts = [], cols = [];
-        doc.features.forEach(function (f) {
-          var c = f.geometry.coordinates;
-          var shade = f.properties.index ? 0.30 : 0.62;
-          var prev = null;
-          for (var i = 0; i < c.length; i++) {
-            var px = (c[i][0] - data.origin.lon) * m.lon, py = (c[i][1] - data.origin.lat) * m.lat;
-            var gz = terrainAt(px, py);
-            if (gz === null) { prev = null; continue; }
-            var cur = [px, py, gz + 0.3];
-            if (prev) {
-              pts.push(prev[0], prev[1], prev[2], cur[0], cur[1], cur[2]);
-              cols.push(shade, shade, shade, shade, shade, shade);
-            }
-            prev = cur;
+    // ---- contours per tile, by marching squares over its own DEM
+    function buildContours(t) {
+      var N = TILE_N, dem = t.dem, b = t.b, dlon = (b.lon1 - b.lon0) / N, dlat = (b.lat1 - b.lat0) / N;
+      var interval = intervalFor(t.z), pts = [], cols = [];
+      function X(i) { return (b.lon0 + (i + 0.5) * dlon - data.origin.lon) * m.lon; }
+      function Y(j) { return (b.lat0 + (j + 0.5) * dlat - data.origin.lat) * m.lat; }
+      var lo = t.zmin, hi = t.zmax;
+      for (var level = Math.ceil(lo / interval) * interval; level <= hi; level += interval) {
+        var shade = (level % (interval * 5) === 0) ? 0.25 : 0.55;
+        for (var j = 0; j < N - 1; j++) for (var i = 0; i < N - 1; i++) {
+          var a = dem[j * N + i], bb = dem[j * N + i + 1], c = dem[(j + 1) * N + i + 1], d = dem[(j + 1) * N + i];
+          if (isNaN(a) || isNaN(bb) || isNaN(c) || isNaN(d)) continue;
+          var idx = (a >= level ? 1 : 0) | (bb >= level ? 2 : 0) | (c >= level ? 4 : 0) | (d >= level ? 8 : 0);
+          if (idx === 0 || idx === 15) continue;
+          var e = {};
+          if ((a >= level) !== (bb >= level)) e.b = [X(i + (level - a) / (bb - a)), Y(j)];
+          if ((bb >= level) !== (c >= level)) e.r = [X(i + 1), Y(j + (level - bb) / (c - bb))];
+          if ((d >= level) !== (c >= level)) e.t = [X(i + (level - d) / (c - d)), Y(j + 1)];
+          if ((a >= level) !== (d >= level)) e.l = [X(i), Y(j + (level - a) / (d - a))];
+          var pairs = {1: [["l", "b"]], 2: [["b", "r"]], 3: [["l", "r"]], 4: [["r", "t"]], 5: [["l", "t"], ["b", "r"]],
+                       6: [["b", "t"]], 7: [["l", "t"]], 8: [["t", "l"]], 9: [["b", "t"]], 10: [["l", "b"], ["t", "r"]],
+                       11: [["r", "t"]], 12: [["l", "r"]], 13: [["b", "r"]], 14: [["l", "b"]]}[idx];
+          pairs.forEach(function (pr) {
+            var p0 = e[pr[0]], p1 = e[pr[1]];
+            if (!p0 || !p1) return;
+            pts.push(p0[0], p0[1], level + 0.3, p1[0], p1[1], level + 0.3);
+            cols.push(shade, shade, shade, shade, shade, shade);
+          });
+        }
+      }
+      if (!pts.length) return;
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+      g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+      var lines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
+      lines.renderOrder = 2;
+      lines.visible = showContours;
+      t.node.add(lines);
+      t.node.userData.lines = lines;
+    }
+
+    // ---- what a tile wears
+    function applyMode(t) {
+      if (!t.node) return;
+      var mesh = t.node.userData.mesh, g = mesh.geometry, mat = mesh.material;
+      if (groundMode === "relief" || groundMode === "off") {
+        g.setAttribute("color", g.userData.ramp); mat.map = null;
+      } else {
+        g.setAttribute("color", g.userData.grey);
+        // Past the basemap's last zoom a tile wears its ancestor's image,
+        // cropped to its own quarter of it, so the ground keeps refining
+        // after the photographs stop.
+        var bm = BASEMAPS[groundMode], d = Math.max(0, t.z - bm.zmax), f = 1 << d;
+        var ax = t.x >> d, ay = t.y >> d, tk = groundMode + ":" + d;
+        if (!t.tex[tk]) {
+          var url = bm.url.replace("{z}", t.z - d).replace("{x}", ax).replace("{y}", ay);
+          t.tex[tk] = loader.load(url);
+          t.tex[tk].anisotropy = 4;
+        }
+        mat.map = t.tex[tk];
+        if (!g.userData.uvd) g.userData.uvd = {};
+        if (!g.userData.uvd[d]) {
+          var base = g.userData.uv0, arr = new Float32Array(base.length);
+          var ox = t.x - ax * f, oy = t.y - ay * f;
+          for (var q = 0; q < base.length / 2; q++) {
+            arr[q * 2] = (base[q * 2] + ox) / f;
+            arr[q * 2 + 1] = 1 - ((1 - base[q * 2 + 1]) + oy) / f;
           }
-        });
-        var g = new THREE.BufferGeometry();
-        g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-        g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
-        contourLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
-          vertexColors: true, transparent: true, opacity: 0.8 }));
-        contourLines.userData = { keep: true };
-        contourLines.renderOrder = 2;
-        root.add(contourLines);
-        applyVisible();
-      }).catch(function () { contoursDoc = null; });
+          g.userData.uvd[d] = new THREE.BufferAttribute(arr, 2);
+        }
+        g.setAttribute("uv", g.userData.uvd[d]);
+      }
+      mat.opacity = groundOpacity;
+      mat.needsUpdate = true;
+    }
+
+    // ---- fetching, nearest first, a few at a time
+    function request(t) {
+      if (t.state !== "empty") return;
+      t.state = "queued";
+      if (t.z === Z_BASE) {
+        var N = TILE_N, b = t.b, dlon = (b.lon1 - b.lon0) / N, dlat = (b.lat1 - b.lat0) / N, dem = new Float32Array(N * N);
+        for (var j = 0; j < N; j++) for (var i = 0; i < N; i++) {
+          var v = coarseAt(b.lon0 + (i + 0.5) * dlon, b.lat0 + (j + 0.5) * dlat);
+          dem[j * N + i] = v === null ? NaN : v;
+        }
+        if (!buildTile(t, dem)) t.state = "failed";
+        return;
+      }
+      queue.push(t);
+      pump();
+    }
+    function pump() {
+      if (inflight >= INFLIGHT || !queue.length) return;
+      var cp = camera.position;
+      queue.sort(function (p, q) {
+        var dp = (p.cx - cp.x) * (p.cx - cp.x) + (p.cy - cp.y) * (p.cy - cp.y);
+        var dq = (q.cx - cp.x) * (q.cx - cp.x) + (q.cy - cp.y) * (q.cy - cp.y);
+        return dp - dq;
+      });
+      while (inflight < INFLIGHT && queue.length) fetchOne(queue.shift());
+    }
+    function fetchOne(t) {
+      t.state = "loading"; inflight++;
+      var N = TILE_N, b = t.b;
+      var url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?" +
+        "bbox=" + [b.lon0, b.lat0, b.lon1, b.lat1].join(",") + "&bboxSR=4326&imageSR=4326&size=" + N + "," + N +
+        "&format=tiff&pixelType=F32&interpolation=RSP_BilinearInterpolation&f=image";
+      var attempt = function (k) {
+        return fetch(url).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).catch(function () { return null; })
+          .then(function (buf) {
+            if (!buf && k > 0) return new Promise(function (res) { setTimeout(res, 1500); }).then(function () { return attempt(k - 1); });
+            return buf;
+          });
+      };
+      attempt(1).then(function (buf) {
+        inflight--;
+        if (!buf) { t.state = "failed"; pump(); return; }
+        var r = readTiffF32(buf);
+        if (r.w !== N || r.h !== N) { t.state = "failed"; pump(); return; }
+        var dem = new Float32Array(N * N);
+        for (var j = 0; j < N; j++) for (var i = 0; i < N; i++) {
+          var z = r.z[(N - 1 - j) * N + i];
+          dem[j * N + i] = (z > -500 && z < 4500) ? z : NaN;
+        }
+        if (!buildTile(t, dem)) t.state = "failed";
+        pump();
+        schedule();
+      });
+    }
+
+    // ---- which tiles to show, from the camera
+    function children(t) {
+      if (t.children) return t.children;
+      t.children = [];
+      for (var dy = 0; dy < 2; dy++) for (var dx = 0; dx < 2; dx++)
+        t.children.push(makeTile(t.z + 1, t.x * 2 + dx, t.y * 2 + dy, t));
+      return t.children;
+    }
+    function box(t) {
+      var half = t.size / 2, hy = ((t.b.lat1 - t.b.lat0) * m.lat) / 2;
+      return new THREE.Box3(new THREE.Vector3(t.cx - half, t.cy - hy, t.zmin * EXAG - 50),
+                            new THREE.Vector3(t.cx + half, t.cy + hy, t.zmax * EXAG + 50));
+    }
+    function hideTree(t) {
+      if (t.node) t.node.visible = false;
+      if (t.children) t.children.forEach(hideTree);
+    }
+    function visit(t, now) {
+      if (!frustum.intersectsBox(box(t))) { hideTree(t); return; }
+      t.used = now;
+      var cp = camera.position, dz = (t.zmin + t.zmax) / 2 * EXAG;
+      var d = Math.sqrt((t.cx - cp.x) * (t.cx - cp.x) + (t.cy - cp.y) * (t.cy - cp.y) + (dz - cp.z) * (dz - cp.z));
+      var want = t.z < Z_MAX && t.size / Math.max(d, 1) > SPLIT;
+      if (t.state === "empty") request(t);
+      if (want) {
+        var kids = children(t), ready = true;
+        kids.forEach(function (c) { if (c.state === "empty") request(c); if (c.state !== "ready") ready = false; });
+        if (ready) {
+          if (t.node) t.node.visible = false;
+          kids.forEach(function (c) { visit(c, now); });
+          return;
+        }
+      } else if (t.children) {
+        t.children.forEach(hideTree);
+      }
+      if (t.node) t.node.visible = groundMode !== "off";
+    }
+    function update() {
+      if (!camera || !base.length) return;
+      camera.updateMatrixWorld();
+      pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      frustum.setFromProjectionMatrix(pm);
+      var now = Date.now();
+      base.forEach(function (t) { visit(t, now); });
+      pump();
+      evict(now);
+    }
+    var schedTimer = null;
+    function schedule() {
+      if (schedTimer) return;
+      schedTimer = setTimeout(function () { schedTimer = null; update(); }, 120);
+    }
+    // Tiles not looked at for a minute are let go, finest first, once there
+    // are more than a few hundred of them.
+    function evict(now) {
+      var all = Object.keys(tiles);
+      if (all.length < 500) return;
+      all.forEach(function (k) {
+        var t = tiles[k];
+        if (t.z <= Z_BASE + 2 || t.state !== "ready" || now - t.used < 60000 || t.children) return;
+        group.remove(t.node);
+        t.node.userData.mesh.geometry.dispose();
+        Object.keys(t.tex).forEach(function (mk) { t.tex[mk].dispose(); });
+        if (t.parent) t.parent.children = null;
+        delete tiles[k];
+      });
+    }
+
+    // ---- height at a point: the finest ready tile containing it
+    function at(x, y) {
+      var lon = data.origin.lon + x / m.lon, lat = data.origin.lat + y / m.lat;
+      var n = 1 << Z_BASE, mc = mercator(lon, lat);
+      var t = tiles[key(Z_BASE, Math.floor(mc[0] * n), Math.floor(mc[1] * n))];
+      if (!t || t.state !== "ready") return coarseAt(lon, lat);
+      while (t.children) {
+        var n2 = 1 << (t.z + 1), c = tiles[key(t.z + 1, Math.floor(mc[0] * n2), Math.floor(mc[1] * n2))];
+        if (!c || c.state !== "ready") break;
+        t = c;
+      }
+      var N = TILE_N, b = t.b;
+      var fx = (lon - b.lon0) / (b.lon1 - b.lon0) * N - 0.5, fy = (lat - b.lat0) / (b.lat1 - b.lat0) * N - 0.5;
+      var ix = Math.max(0, Math.min(N - 2, Math.floor(fx))), iy = Math.max(0, Math.min(N - 2, Math.floor(fy)));
+      var tx = Math.max(0, Math.min(1, fx - ix)), ty = Math.max(0, Math.min(1, fy - iy));
+      var a = t.dem[iy * N + ix], bb = t.dem[iy * N + ix + 1], c2 = t.dem[(iy + 1) * N + ix], d = t.dem[(iy + 1) * N + ix + 1];
+      if (isNaN(a) || isNaN(bb) || isNaN(c2) || isNaN(d)) return coarseAt(lon, lat);
+      if (tx + ty <= 1) return a + (bb - a) * tx + (c2 - a) * ty;
+      return d + (c2 - d) * (1 - tx) + (bb - d) * (1 - ty);
+    }
+
+    // ---- lines and marks laid on the ground follow the tiles as they come
+    function scheduleDrape() {
+      if (drapeTimer) return;
+      drapeTimer = setTimeout(function () { drapeTimer = null; redrape(); }, 400);
+    }
+    function redrape() {
+      [gridLines].concat(heads).forEach(function (obj) {
+        if (!obj || !obj.userData.xy) return;
+        var xy = obj.userData.xy, p = obj.geometry.getAttribute("position"), lift = obj.userData.lift || 0;
+        for (var i = 0; i < xy.length / 2; i++) {
+          var z = at(xy[i * 2], xy[i * 2 + 1]);
+          if (z !== null) p.setZ(i, z + lift);
+        }
+        p.needsUpdate = true;
+      });
+      if (mark) {
+        var z0 = at(mark.userData.x, mark.userData.y);
+        if (z0 !== null) {
+          var ring = mark.children[0].geometry.getAttribute("position"); ring.setZ(0, z0); ring.needsUpdate = true;
+          var pin = mark.children[1]; pin.userData.base = z0;
+          var pp = pin.geometry.getAttribute("position"); pp.setZ(0, z0); pp.needsUpdate = true;
+          sizeMark();
+        }
+      }
+    }
+
+    function setMode() { Object.keys(tiles).forEach(function (k) { applyMode(tiles[k]); }); schedule(); }
+    function setContours(on) {
+      Object.keys(tiles).forEach(function (k) { var l = tiles[k].node && tiles[k].node.userData.lines; if (l) l.visible = on; });
+    }
+
+    // ---- the base level, cut from the grid on the page
+    (function () {
+      var n = 1 << Z_BASE;
+      var a = mercator(terr.min_lon, terr.min_lat + terr.ny * terr.step_lat);
+      var b = mercator(terr.min_lon + terr.nx * terr.step_lon, terr.min_lat);
+      for (var ty = Math.floor(a[1] * n); ty <= Math.floor(b[1] * n); ty++)
+        for (var tx = Math.floor(a[0] * n); tx <= Math.floor(b[0] * n); tx++) {
+          var t = makeTile(Z_BASE, tx, ty, null);
+          base.push(t);
+          request(t);
+        }
+    })();
+
+    return { group: group, update: schedule, at: at, redrape: redrape, setMode: setMode,
+             setContours: setContours, count: function () { return Object.keys(tiles).length; } };
   }
 
-  // ------------------------------------------------- the ground of a pad
-  // The elevation service answers with an uncompressed tiled float TIFF.
-  // Reading it here is a short parse: one sample per pixel, no compression.
   function readTiffF32(buf) {
     var dv = new DataView(buf), le = dv.getUint16(0, true) === 0x4949;
     var u16 = function (o) { return dv.getUint16(o, le); }, u32 = function (o) { return dv.getUint32(o, le); };
@@ -1114,7 +1372,6 @@ function gossansStrata() {
   // What the view is centred on, at the resolution the distance deserves.
   // Asked for a little after the camera stops moving, and only when it has
   // moved far enough or come close enough to need a different window.
-  var focus = { key: null, timer: null, loading: null };
   var mark = null;                       // the isolated well's ring and pin
 
   function ringTexture() {
@@ -1149,7 +1406,7 @@ function gossansStrata() {
     pin.renderOrder = 10;
     pin.userData = { base: z };
     mark.add(pin);
-    mark.userData = { wi: wi };
+    mark.userData = { wi: wi, x: x, y: y };
     root.add(mark);
     sizeMark();
   }
@@ -1167,247 +1424,19 @@ function gossansStrata() {
     a.setZ(1, pin.userData.base + h);
     a.needsUpdate = true;
   }
-  function focusSoon() {
-    if (focus.timer) clearTimeout(focus.timer);
-    focus.timer = setTimeout(focusCheck, 450);
-  }
-  function focusLevel() {
-    // Up to 150 km out the ground under the view is refetched at 800 cells
-    // across its window: 300 m cells at the far end, one metre near. Beyond
-    // that the basin-wide grid and texture are what the view deserves.
-    if (!terr || dist > 150000) return null;
-    var m = metres(), window_m = Math.max(600, dist * 1.6), n = 800;
-    var cell = Math.max(1, window_m / n);
-    var lat = data.origin.lat + target.y / m.lat;
-    var z = Math.round(Math.log2(156543.03 * Math.cos(lat * Math.PI / 180) / cell));
-    var zmax = groundMode === "osm" ? 18 : 16;
-    z = Math.max(9, Math.min(zmax, z));
-    // An interval that suits the cell: one contour per few cells of relief,
-    // so a mountain front at 40 km is a pattern and a pad at 500 m is a plan.
-    var interval = cell <= 1.5 ? 1 : cell <= 3 ? 2 : cell <= 8 ? 5 : cell <= 20 ? 10
-                 : cell <= 60 ? 20 : cell <= 150 ? 50 : 100;
-    return { cell: cell, n: Math.round(window_m / cell), z: z, interval: interval, window_m: window_m };
-  }
-  function focusCheck() {
-    focus.timer = null;
-    var L = focusLevel();
-    if (!L) {
-      if (focus.key) { clearFocus(); }
-      return;
-    }
-    // A new window when the level changes or the centre leaves the middle
-    // third of the current one.
-    var kx = Math.round(target.x / (L.window_m / 3)), ky = Math.round(target.y / (L.window_m / 3));
-    var key = [Math.round(L.cell * 10), kx, ky].join(":");
-    if (key === focus.key || key === focus.loading) return;
-    focus.loading = key;
-    loadFocus(target.x, target.y, L, key);
-  }
-  function clearFocus() {
-    focus.key = null;
-    if (patch) { root.remove(patch); patch = null; }
-    if (padContours) { root.remove(padContours); padContours = null; }
-  }
-
-  function loadFocus(cx, cy, L, key) {
-    var m = metres(), cell = L.cell;
-    var lon = data.origin.lon + cx / m.lon, lat = data.origin.lat + cy / m.lat;
-    var stepLat = cell / m.lat, stepLon = cell / m.lon;
-    var nx = L.n, ny = L.n;
-    var lon0 = lon - nx / 2 * stepLon, lat0 = lat - ny / 2 * stepLat;
-    var url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?" +
-      "bbox=" + [lon0, lat0, lon0 + nx * stepLon, lat0 + ny * stepLat].join(",") +
-      "&bboxSR=4326&imageSR=4326&size=" + nx + "," + ny + "&format=tiff&pixelType=F32" +
-      "&interpolation=RSP_BilinearInterpolation&f=image";
-    var attempt = function (k) {
-      return fetch(url).then(function (r) { return r.ok ? r.arrayBuffer() : null; })
-        .catch(function () { return null; })
-        .then(function (buf) {
-          if (!buf && k > 0) return new Promise(function (res) { setTimeout(res, 1500); }).then(function () { return attempt(k - 1); });
-          return buf;
-        });
-    };
-    attempt(2).then(function (buf) {
-      if (focus.loading !== key) return;            // the camera moved on
-      if (!buf) { focus.loading = null; return; }
-      var t = readTiffF32(buf);
-      if (t.w !== nx || t.h !== ny) { focus.loading = null; return; }
-      var pos = new Float32Array(nx * ny * 3), grid = new Float32Array(nx * ny);
-      for (var j = 0; j < ny; j++) for (var i = 0; i < nx; i++) {
-        var z = t.z[(ny - 1 - j) * nx + i];
-        if (!(z > -500 && z < 4500)) z = NaN;
-        grid[j * nx + i] = z;
-        var k = j * nx + i;
-        pos[k * 3] = (lon0 + (i + 0.5) * stepLon - data.origin.lon) * m.lon;
-        pos[k * 3 + 1] = (lat0 + (j + 0.5) * stepLat - data.origin.lat) * m.lat;
-        pos[k * 3 + 2] = isNaN(z) ? 0 : z;
-      }
-      var idx = [];
-      for (var jj = 0; jj < ny - 1; jj++) for (var ii = 0; ii < nx - 1; ii++) {
-        var q = jj * nx + ii;
-        if (isNaN(grid[q]) || isNaN(grid[q + 1]) || isNaN(grid[q + nx]) || isNaN(grid[q + nx + 1])) continue;
-        idx.push(q, q + nx, q + 1, q + 1, q + nx, q + nx + 1);
-      }
-      var g = new THREE.BufferGeometry();
-      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-      g.setIndex(idx);
-      var uv = padUv(lon0, lat0, stepLon, stepLat, nx, ny, L.z);
-      g.setAttribute("uv", new THREE.BufferAttribute(uv.arr, 2));
-      var mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: uv.tex, side: THREE.DoubleSide,
-        transparent: true, opacity: groundOpacity, depthWrite: true,
-        polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
-      mesh.renderOrder = 1;
-      if (patch) root.remove(patch);
-      patch = mesh;
-      root.add(patch);
-      focus.key = key; focus.loading = null;
-      buildPadContours(grid, nx, ny, lon0, lat0, stepLon, stepLat, L.interval);
-      var note = document.querySelector(".gnote");
-      if (note) note.textContent = "Ground within " + (L.window_m / 2000).toFixed(1) + " km is the one-metre model at " +
-        (cell < 10 ? cell.toFixed(1) : Math.round(cell)) + " m, contours at " + L.interval + " m, imagery at zoom " + L.z + ".";
-    });
-  }
-
-  // Tiles for the pad window at z14, as a texture and the UVs to fit it.
-  function padUv(lon0, lat0, stepLon, stepLat, nx, ny, zoom) {
-    var z = zoom || 14, n = 1 << z;
-    var a = mercator(lon0, lat0 + ny * stepLat), b = mercator(lon0 + nx * stepLon, lat0);
-    var fr = { tx0: Math.floor(a[0] * n), ty0: Math.floor(a[1] * n), tx1: Math.floor(b[0] * n), ty1: Math.floor(b[1] * n) };
-    fr.w = (fr.tx1 - fr.tx0 + 1) * 256; fr.h = (fr.ty1 - fr.ty0 + 1) * 256;
-    var arr = new Float32Array(nx * ny * 2);
-    for (var j = 0; j < ny; j++) for (var i = 0; i < nx; i++) {
-      var mc = mercator(lon0 + (i + 0.5) * stepLon, lat0 + (j + 0.5) * stepLat), k = j * nx + i;
-      arr[k * 2] = (mc[0] * n * 256 - fr.tx0 * 256) / fr.w;
-      arr[k * 2 + 1] = 1 - (mc[1] * n * 256 - fr.ty0 * 256) / fr.h;
-    }
-    var canvas = document.createElement("canvas");
-    canvas.width = fr.w; canvas.height = fr.h;
-    var ctx = canvas.getContext("2d"), tex = new THREE.CanvasTexture(canvas);
-    tex.anisotropy = 4;
-    var bm = BASEMAPS[groundMode === "relief" || groundMode === "off" ? "imagery" : groundMode];
-    for (var ty = fr.ty0; ty <= fr.ty1; ty++) for (var tx = fr.tx0; tx <= fr.tx1; tx++) (function (tx, ty) {
-      var img = new Image(); img.crossOrigin = "anonymous";
-      img.onload = function () { ctx.drawImage(img, (tx - fr.tx0) * 256, (ty - fr.ty0) * 256); tex.needsUpdate = true; };
-      img.src = bm.url.replace("{z}", z).replace("{x}", tx).replace("{y}", ty);
-    })(tx, ty);
-    return { arr: arr, tex: tex };
-  }
-
-  // Marching squares over the pad grid, one level at a time.
-  function buildPadContours(grid, nx, ny, lon0, lat0, stepLon, stepLat, interval) {
-    if (padContours) { root.remove(padContours); padContours = null; }
-    var m = metres(), pts = [], cols = [];
-    var lo = Infinity, hi = -Infinity;
-    for (var q = 0; q < grid.length; q++) { var v = grid[q]; if (!isNaN(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } }
-    if (!(hi > lo)) return;
-    function X(i) { return (lon0 + (i + 0.5) * stepLon - data.origin.lon) * m.lon; }
-    function Y(j) { return (lat0 + (j + 0.5) * stepLat - data.origin.lat) * m.lat; }
-    for (var level = Math.ceil(lo / interval) * interval; level <= hi; level += interval) {
-      var shade = (level % (interval * 5) === 0) ? 0.25 : 0.55;
-      for (var j = 0; j < ny - 1; j++) for (var i = 0; i < nx - 1; i++) {
-        var a = grid[j * nx + i], b = grid[j * nx + i + 1], c = grid[(j + 1) * nx + i + 1], d = grid[(j + 1) * nx + i];
-        if (isNaN(a) || isNaN(b) || isNaN(c) || isNaN(d)) continue;
-        var idx = (a >= level ? 1 : 0) | (b >= level ? 2 : 0) | (c >= level ? 4 : 0) | (d >= level ? 8 : 0);
-        if (idx === 0 || idx === 15) continue;
-        var e = {};
-        if ((a >= level) !== (b >= level)) { var t1 = (level - a) / (b - a); e.b = [X(i + t1), Y(j)]; }
-        if ((b >= level) !== (c >= level)) { var t2 = (level - b) / (c - b); e.r = [X(i + 1), Y(j + t2)]; }
-        if ((d >= level) !== (c >= level)) { var t3 = (level - d) / (c - d); e.t = [X(i + t3), Y(j + 1)]; }
-        if ((a >= level) !== (d >= level)) { var t4 = (level - a) / (d - a); e.l = [X(i), Y(j + t4)]; }
-        var pairs = {1: [["l", "b"]], 2: [["b", "r"]], 3: [["l", "r"]], 4: [["r", "t"]], 5: [["l", "t"], ["b", "r"]],
-                     6: [["b", "t"]], 7: [["l", "t"]], 8: [["t", "l"]], 9: [["b", "t"]], 10: [["l", "b"], ["t", "r"]],
-                     11: [["r", "t"]], 12: [["l", "r"]], 13: [["b", "r"]], 14: [["l", "b"]]}[idx];
-        pairs.forEach(function (pr) {
-          var p0 = e[pr[0]], p1 = e[pr[1]];
-          if (!p0 || !p1) return;
-          pts.push(p0[0], p0[1], level + 0.3, p1[0], p1[1], level + 0.3);
-          cols.push(shade, shade, shade, shade, shade, shade);
-        });
-      }
-    }
-    if (!pts.length) return;
-    var g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-    g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
-    padContours = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
-    padContours.renderOrder = 2;
-    root.add(padContours);
-    applyVisible();
-  }
-
-  // ---------------------------------------------------------- basemaps
   function mercator(lon, lat) {
     var sn = Math.sin(lat * Math.PI / 180);
     return [(lon + 180) / 360, 0.5 - Math.log((1 + sn) / (1 - sn)) / (4 * Math.PI)];
   }
 
-  // The tile zoom that covers the region in at most about 160 tiles: what
-  // one person looking at one map would load, and no more.
-  function tileFrame() {
-    var lon1 = terr.min_lon + terr.nx * terr.step_lon;
-    var lat1 = terr.min_lat + terr.ny * terr.step_lat;
-    var a = mercator(terr.min_lon, lat1), b = mercator(lon1, terr.min_lat);
-    for (var z = 12; z >= 5; z--) {
-      var n = 1 << z;
-      var tx0 = Math.floor(a[0] * n), ty0 = Math.floor(a[1] * n);
-      var tx1 = Math.floor(b[0] * n), ty1 = Math.floor(b[1] * n);
-      if ((tx1 - tx0 + 1) * (ty1 - ty0 + 1) <= 160)
-        return { z: z, n: n, tx0: tx0, ty0: ty0, tx1: tx1, ty1: ty1,
-                 w: (tx1 - tx0 + 1) * 256, h: (ty1 - ty0 + 1) * 256 };
-    }
-  }
 
-  var groundTex = {};
-  function loadBasemap(mode) {
-    if (groundTex[mode]) return groundTex[mode];
-    var fr = tileFrame(), bm = BASEMAPS[mode];
-    var canvas = document.createElement("canvas");
-    canvas.width = fr.w; canvas.height = fr.h;
-    var ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#e9e4da"; ctx.fillRect(0, 0, fr.w, fr.h);
-    var tex = new THREE.CanvasTexture(canvas);
-    tex.anisotropy = 4;
-    groundTex[mode] = tex;
-    // Each tile is painted as it arrives, so the ground fills in rather than
-    // appearing all at once after the last tile.
-    for (var ty = fr.ty0; ty <= fr.ty1; ty++) {
-      for (var tx = fr.tx0; tx <= fr.tx1; tx++) {
-        (function (tx, ty) {
-          var img = new Image();
-          img.crossOrigin = "anonymous";
-          img.onload = function () {
-            ctx.drawImage(img, (tx - fr.tx0) * 256, (ty - fr.ty0) * 256);
-            tex.needsUpdate = true;
-          };
-          img.src = bm.url.replace("{z}", fr.z).replace("{x}", tx).replace("{y}", ty);
-        })(tx, ty);
-      }
-    }
-    return tex;
-  }
-
+  //: what the ground can wear, applied to every tile
   function applyGround() {
     var credit = document.getElementById("credit");
     if (credit) credit.innerHTML = (BASEMAPS[groundMode] || {}).credit || "";
-    if (!ground) return;
-    ground.visible = groundMode !== "off";
-    if (groundMode === "off") return;
-    var g = ground.geometry, m = ground.material;
-    if (groundMode === "relief") {
-      g.setAttribute("color", g.userData.ramp);
-      m.map = null;
-    } else {
-      g.setAttribute("color", g.userData.shade);
-      m.map = loadBasemap(groundMode);
-    }
-    m.opacity = groundOpacity;
-    if (patch) patch.material.opacity = groundOpacity;
-    m.needsUpdate = true;
-    focus.key = null; focusSoon();
+    if (terrain) terrain.setMode();
   }
 
-  // The survey grid, laid on the ground rather than floating over it. Each
-  // township edge is walked in steps so it follows the terrain it crosses.
   function buildGrid() {
     if (!plss || !terr) return;
     var m = metres(), pts = [], STEP = 600;
@@ -1439,8 +1468,11 @@ function gossansStrata() {
     if (!pts.length) return;
     var g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pts), 3));
+    var xy = new Float32Array(pts.length / 3 * 2);
+    for (var q = 0; q < pts.length / 3; q++) { xy[q * 2] = pts[q * 3]; xy[q * 2 + 1] = pts[q * 3 + 1]; }
     gridLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
       color: 0x54606b, transparent: true, opacity: 0.55 }));
+    gridLines.userData = { xy: xy, lift: 0.3 };
     gridLines.renderOrder = 2;
     root.add(gridLines);
   }
@@ -1661,10 +1693,8 @@ function gossansStrata() {
   }
 
   function applyVisible() {
-    if (ground) ground.visible = groundMode !== "off";
     heads.forEach(function (h) { h.visible = true; });
-    if (contourLines) contourLines.visible = showContours && !padContours;
-    if (padContours) padContours.visible = showContours;
+    if (terrain) { terrain.setContours(showContours); terrain.update(); }
     if (gridLines) gridLines.visible = showGrid;
     tops.forEach(function (p) { p.visible = !hidden[p.userData.formation]; });
     lines.forEach(function (l) {
@@ -1697,7 +1727,7 @@ function gossansStrata() {
     orient();
     sizeHeads();
     sizeMark();
-    focusSoon();
+    if (terrain) terrain.update();
   }
 
   // Which way the camera is facing, in the terms a survey reader uses: a rose
