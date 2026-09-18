@@ -961,7 +961,7 @@ function gossansStrata() {
   // screen. Each imagery tile is pinned to the terrain tile of the same
   // footprint, so photo and elevation cannot drift apart.
   var terrain = null;
-  var TILE_N = 48, Z_BASE = 9, Z_MAX = 19, SPLIT = 0.45, INFLIGHT = 6;
+  var TILE_N = 49, Z_BASE = 9, Z_MAX = 19, SPLIT = 0.45, INFLIGHT = 6;
 
   function makeTerrain() {
     var group = new THREE.Group(), tiles = {}, queue = [], inflight = 0;
@@ -994,8 +994,8 @@ function gossansStrata() {
 
     // ---- geometry from a tile's own DEM, rows south to north
     function buildTile(t, dem) {
-      var N = TILE_N, b = t.b, dlon = (b.lon1 - b.lon0) / N, dlat = (b.lat1 - b.lat0) / N;
-      var cell = t.size / N;
+      var N = TILE_N, b = t.b, dlon = (b.lon1 - b.lon0) / (N - 1), dlat = (b.lat1 - b.lat0) / (N - 1);
+      var cell = t.size / (N - 1);
       var lo = Infinity, hi = -Infinity, i, j, k;
       for (k = 0; k < dem.length; k++) { var v = dem[k]; if (!isNaN(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } }
       if (!(hi >= lo)) return false;
@@ -1004,7 +1004,7 @@ function gossansStrata() {
       var glo = terr ? 900 : lo, ghi = terr ? 2800 : hi;
       for (j = 0; j < N; j++) for (i = 0; i < N; i++) {
         k = j * N + i;
-        var lon = b.lon0 + (i + 0.5) * dlon, lat = b.lat0 + (j + 0.5) * dlat;
+        var lon = b.lon0 + i * dlon, lat = b.lat0 + j * dlat;
         var z = dem[k]; if (isNaN(z)) z = lo;
         pos[k * 3] = (lon - data.origin.lon) * m.lon; pos[k * 3 + 1] = (lat - data.origin.lat) * m.lat; pos[k * 3 + 2] = z;
         var mc = mercator(lon, lat), n = 1 << t.z;
@@ -1021,7 +1021,7 @@ function gossansStrata() {
       }
       // Skirts: the edge ring again, dropped, so neighbouring tiles at a
       // different level do not show a crack of sky between them.
-      var drop = Math.max(6, cell * 3), sk = N * N, edges = [];
+      var drop = Math.max(3, t.size * 0.03), sk = N * N, edges = [];
       for (i = 0; i < N; i++) edges.push(i);                       // south row
       for (j = 0; j < N; j++) edges.push(j * N + N - 1);           // east column
       for (i = N - 1; i >= 0; i--) edges.push((N - 1) * N + i);    // north row
@@ -1029,7 +1029,7 @@ function gossansStrata() {
       for (k = 0; k < skirt; k++) {
         var src = edges[k], dst = sk + k;
         pos[dst * 3] = pos[src * 3]; pos[dst * 3 + 1] = pos[src * 3 + 1]; pos[dst * 3 + 2] = pos[src * 3 + 2] - drop;
-        for (var c3 = 0; c3 < 3; c3++) { ramp[dst * 3 + c3] = ramp[src * 3 + c3] * 0.8; grey[dst * 3 + c3] = grey[src * 3 + c3] * 0.8; }
+        for (var c3 = 0; c3 < 3; c3++) { ramp[dst * 3 + c3] = ramp[src * 3 + c3]; grey[dst * 3 + c3] = grey[src * 3 + c3]; }
         uv[dst * 2] = uv[src * 2]; uv[dst * 2 + 1] = uv[src * 2 + 1];
       }
       var idx = [];
@@ -1053,7 +1053,7 @@ function gossansStrata() {
       mesh.renderOrder = 0;
       var node = new THREE.Group();
       node.add(mesh);
-      node.userData = { mesh: mesh, lines: null };
+      node.userData = { mesh: mesh, lines: null, drop: drop };
       t.dem = dem; t.zmin = lo; t.zmax = hi; t.node = node; t.state = "ready";
       node.visible = false;
       group.add(node);
@@ -1065,10 +1065,10 @@ function gossansStrata() {
 
     // ---- contours per tile, by marching squares over its own DEM
     function buildContours(t) {
-      var N = TILE_N, dem = t.dem, b = t.b, dlon = (b.lon1 - b.lon0) / N, dlat = (b.lat1 - b.lat0) / N;
+      var N = TILE_N, dem = t.dem, b = t.b, dlon = (b.lon1 - b.lon0) / (N - 1), dlat = (b.lat1 - b.lat0) / (N - 1);
       var interval = intervalFor(t.z), pts = [], cols = [];
-      function X(i) { return (b.lon0 + (i + 0.5) * dlon - data.origin.lon) * m.lon; }
-      function Y(j) { return (b.lat0 + (j + 0.5) * dlat - data.origin.lat) * m.lat; }
+      function X(i) { return (b.lon0 + i * dlon - data.origin.lon) * m.lon; }
+      function Y(j) { return (b.lat0 + j * dlat - data.origin.lat) * m.lat; }
       var lo = t.zmin, hi = t.zmax;
       for (var level = Math.ceil(lo / interval) * interval; level <= hi; level += interval) {
         var shade = (level % (interval * 5) === 0) ? 0.25 : 0.55;
@@ -1119,10 +1119,11 @@ function gossansStrata() {
         var ax = t.x >> d, ay = t.y >> d, tk = groundMode + ":" + d;
         if (!t.tex[tk]) {
           var url = bm.url.replace("{z}", t.z - d).replace("{x}", ax).replace("{y}", ay);
-          t.tex[tk] = loader.load(url);
+          t.tex[tk] = loader.load(url, function () { t.tex[tk].loaded = true; applyMode(t); });
           t.tex[tk].anisotropy = 4;
         }
-        mat.map = t.tex[tk];
+        if (t.tex[tk].loaded) { mat.map = t.tex[tk]; }
+        else { mat.map = null; g.setAttribute("color", g.userData.ramp); }
         if (!g.userData.uvd) g.userData.uvd = {};
         if (!g.userData.uvd[d]) {
           var base = g.userData.uv0, arr = new Float32Array(base.length);
@@ -1144,9 +1145,9 @@ function gossansStrata() {
       if (t.state !== "empty") return;
       t.state = "queued";
       if (t.z === Z_BASE) {
-        var N = TILE_N, b = t.b, dlon = (b.lon1 - b.lon0) / N, dlat = (b.lat1 - b.lat0) / N, dem = new Float32Array(N * N);
+        var N = TILE_N, b = t.b, dlon = (b.lon1 - b.lon0) / (N - 1), dlat = (b.lat1 - b.lat0) / (N - 1), dem = new Float32Array(N * N);
         for (var j = 0; j < N; j++) for (var i = 0; i < N; i++) {
-          var v = coarseAt(b.lon0 + (i + 0.5) * dlon, b.lat0 + (j + 0.5) * dlat);
+          var v = coarseAt(b.lon0 + i * dlon, b.lat0 + j * dlat);
           dem[j * N + i] = v === null ? NaN : v;
         }
         if (!buildTile(t, dem)) t.state = "failed";
@@ -1167,9 +1168,9 @@ function gossansStrata() {
     }
     function fetchOne(t) {
       t.state = "loading"; inflight++;
-      var N = TILE_N, b = t.b;
+      var N = TILE_N, b = t.b, hx = (b.lon1 - b.lon0) / (N - 1) / 2, hy = (b.lat1 - b.lat0) / (N - 1) / 2;
       var url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?" +
-        "bbox=" + [b.lon0, b.lat0, b.lon1, b.lat1].join(",") + "&bboxSR=4326&imageSR=4326&size=" + N + "," + N +
+        "bbox=" + [b.lon0 - hx, b.lat0 - hy, b.lon1 + hx, b.lat1 + hy].join(",") + "&bboxSR=4326&imageSR=4326&size=" + N + "," + N +
         "&format=tiff&pixelType=F32&interpolation=RSP_BilinearInterpolation&f=image";
       var attempt = function (k) {
         return fetch(url).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).catch(function () { return null; })
@@ -1212,11 +1213,16 @@ function gossansStrata() {
       if (t.children) t.children.forEach(hideTree);
     }
     function visit(t, now) {
-      if (!frustum.intersectsBox(box(t))) { hideTree(t); return; }
+      var bx = box(t);
+      if (!frustum.intersectsBox(bx)) { hideTree(t); return; }
       t.used = now;
-      var cp = camera.position, dz = (t.zmin + t.zmax) / 2 * EXAG;
-      var d = Math.sqrt((t.cx - cp.x) * (t.cx - cp.x) + (t.cy - cp.y) * (t.cy - cp.y) + (dz - cp.z) * (dz - cp.z));
-      var want = t.z < Z_MAX && t.size / Math.max(d, 1) > SPLIT;
+      var cp = camera.position;
+      var nx = Math.max(bx.min.x, Math.min(bx.max.x, cp.x)), ny = Math.max(bx.min.y, Math.min(bx.max.y, cp.y));
+      var nz = Math.max(bx.min.z, Math.min(bx.max.z, cp.z));
+      var d = Math.sqrt((nx - cp.x) * (nx - cp.x) + (ny - cp.y) * (ny - cp.y) + (nz - cp.z) * (nz - cp.z));
+      var ratio = t.size / Math.max(d, 1);
+      var shown = t.children && t.children.some(function (c) { return c.node && c.node.visible; });
+      var want = t.z < Z_MAX && ratio > (shown ? SPLIT * 0.6 : SPLIT);
       if (t.state === "empty") request(t);
       if (want) {
         var kids = children(t), ready = true;
@@ -1238,8 +1244,73 @@ function gossansStrata() {
       frustum.setFromProjectionMatrix(pm);
       var now = Date.now();
       base.forEach(function (t) { visit(t, now); });
+      stitchAll();
       pump();
       evict(now);
+    }
+
+    // The level of whatever is drawn across a tile's edge: the same tile
+    // key at the same level if it is visible, else the nearest visible
+    // ancestor of that key. Null past the edge of the world.
+    function visibleLevelAt(z, x, y) {
+      var n = 1 << z;
+      if (x < 0 || y < 0 || x >= n || y >= n) return null;
+      for (var zz = z, xx = x, yy = y; zz >= Z_BASE; zz--, xx >>= 1, yy >>= 1) {
+        var t = tiles[key(zz, xx, yy)];
+        if (t && t.node && t.node.visible) return zz;
+        if (t && t.children) continue;
+        if (t) continue;
+      }
+      return null;
+    }
+
+    // Vertex indices along each edge, first to last, and the skirt slot
+    // that mirrors each one.
+    function edgeIndices(side) {
+      var N = TILE_N, out = [];
+      for (var i = 0; i < N; i++) {
+        if (side === "s") out.push(i);
+        else if (side === "e") out.push(i * N + N - 1);
+        else if (side === "n") out.push((N - 1) * N + i);
+        else out.push(i * N);
+      }
+      return out;
+    }
+
+    function stitchAll() {
+      Object.keys(tiles).forEach(function (k) {
+        var t = tiles[k];
+        if (!t.node || !t.node.visible || !t.dem) return;
+        var sides = { s: [t.x, t.y + 1], n: [t.x, t.y - 1], e: [t.x + 1, t.y], w: [t.x - 1, t.y] };
+        var p = t.node.userData.mesh.geometry.getAttribute("position"), changed = false;
+        var N = TILE_N, sk = N * N;
+        Object.keys(sides).forEach(function (side) {
+          var nb = visibleLevelAt(t.z, sides[side][0], sides[side][1]);
+          var kdiff = nb === null ? 0 : Math.max(0, Math.min(4, t.z - nb));
+          var idx = edgeIndices(side), step = 1 << kdiff;
+          // Which slot of the skirt ring each edge vertex has: south row
+          // first, then east, then north reversed, then west reversed.
+          for (var i = 0; i < N; i++) {
+            var vi = idx[i], z;
+            if (kdiff === 0 || i % step === 0) {
+              z = t.dem[vi];
+              if (isNaN(z)) z = t.zmin;
+            } else {
+              var a = idx[i - (i % step)], b = idx[Math.min(N - 1, i - (i % step) + step)];
+              var za = t.dem[a], zb = t.dem[b];
+              if (isNaN(za)) za = t.zmin; if (isNaN(zb)) zb = t.zmin;
+              z = za + (zb - za) * ((i % step) / step);
+            }
+            if (Math.abs(p.getZ(vi) - z) > 1e-3) {
+              p.setZ(vi, z);
+              var slot = side === "s" ? i : side === "e" ? N + i : side === "n" ? 2 * N + (N - 1 - i) : 3 * N + (N - 1 - i);
+              p.setZ(sk + slot, z - t.node.userData.drop);
+              changed = true;
+            }
+          }
+        });
+        if (changed) p.needsUpdate = true;
+      });
     }
     var schedTimer = null;
     function schedule() {
@@ -1274,7 +1345,7 @@ function gossansStrata() {
         t = c;
       }
       var N = TILE_N, b = t.b;
-      var fx = (lon - b.lon0) / (b.lon1 - b.lon0) * N - 0.5, fy = (lat - b.lat0) / (b.lat1 - b.lat0) * N - 0.5;
+      var fx = (lon - b.lon0) / (b.lon1 - b.lon0) * (N - 1), fy = (lat - b.lat0) / (b.lat1 - b.lat0) * (N - 1);
       var ix = Math.max(0, Math.min(N - 2, Math.floor(fx))), iy = Math.max(0, Math.min(N - 2, Math.floor(fy)));
       var tx = Math.max(0, Math.min(1, fx - ix)), ty = Math.max(0, Math.min(1, fy - iy));
       var a = t.dem[iy * N + ix], bb = t.dem[iy * N + ix + 1], c2 = t.dem[(iy + 1) * N + ix], d = t.dem[(iy + 1) * N + ix + 1];
