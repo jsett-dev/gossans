@@ -2185,6 +2185,14 @@ function gossansStrata() {
     window.gossansViews = window.gossansViews || {};
     window.gossansViews.resize3d = function(){ resize(); home(); };
     // Where the camera is, for anyone checking the view from outside.
+    // Put the camera somewhere: {dist, pitch, yaw, target: [x, y, z]}.
+    window.gossansViews.look = function (v) {
+      if (v.target) target.set(v.target[0], v.target[1], v.target[2]);
+      if (v.dist !== undefined) dist = v.dist;
+      if (v.pitch !== undefined) pitch = Math.max(0.05, Math.min(Math.PI - 0.05, v.pitch));
+      if (v.yaw !== undefined) yaw = v.yaw;
+      place();
+    };
     window.gossansViews.camera = function () {
       return { dist: dist, pitch: pitch, yaw: yaw, isolated: isolated,
                target: [target.x, target.y, target.z] };
@@ -2438,7 +2446,10 @@ function gossansStrata() {
     var a = terr.z[iy * terr.nx + ix], b = terr.z[iy * terr.nx + ix + 1],
         c = terr.z[(iy + 1) * terr.nx + ix], d = terr.z[(iy + 1) * terr.nx + ix + 1];
     if (a === null || b === null || c === null || d === null) return null;
-    return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
+    // The cell is drawn as triangles (a, c, b) and (b, c, d), split along
+    // the b-c diagonal; the height is taken from whichever the point is in.
+    if (tx + ty <= 1) return a + (b - a) * tx + (c - a) * ty;
+    return d + (c - d) * (1 - tx) + (b - d) * (1 - ty);
   }
 
   function buildGround() {
@@ -2534,12 +2545,19 @@ function gossansStrata() {
         if (!doc) return;
         var m = metres(), pts = [], cols = [];
         doc.features.forEach(function (f) {
-          var c = f.geometry.coordinates, z = f.properties.z;
+          var c = f.geometry.coordinates;
           var shade = f.properties.index ? 0.30 : 0.62;
-          for (var i = 1; i < c.length; i++) {
-            pts.push((c[i - 1][0] - data.origin.lon) * m.lon, (c[i - 1][1] - data.origin.lat) * m.lat, z + 3,
-                     (c[i][0] - data.origin.lon) * m.lon, (c[i][1] - data.origin.lat) * m.lat, z + 3);
-            cols.push(shade, shade, shade, shade, shade, shade);
+          var prev = null;
+          for (var i = 0; i < c.length; i++) {
+            var px = (c[i][0] - data.origin.lon) * m.lon, py = (c[i][1] - data.origin.lat) * m.lat;
+            var gz = terrainAt(px, py);
+            if (gz === null) { prev = null; continue; }
+            var cur = [px, py, gz + 1.5];
+            if (prev) {
+              pts.push(prev[0], prev[1], prev[2], cur[0], cur[1], cur[2]);
+              cols.push(shade, shade, shade, shade, shade, shade);
+            }
+            prev = cur;
           }
         });
         var g = new THREE.BufferGeometry();
@@ -2655,14 +2673,20 @@ function gossansStrata() {
     focus.timer = setTimeout(focusCheck, 450);
   }
   function focusLevel() {
-    if (!terr || dist > 30000) return null;
+    // Up to 150 km out the ground under the view is refetched at 800 cells
+    // across its window: 300 m cells at the far end, one metre near. Beyond
+    // that the basin-wide grid and texture are what the view deserves.
+    if (!terr || dist > 150000) return null;
     var m = metres(), window_m = Math.max(600, dist * 1.6), n = 800;
     var cell = Math.max(1, window_m / n);
     var lat = data.origin.lat + target.y / m.lat;
     var z = Math.round(Math.log2(156543.03 * Math.cos(lat * Math.PI / 180) / cell));
     var zmax = groundMode === "osm" ? 18 : 16;
-    z = Math.max(12, Math.min(zmax, z));
-    var interval = cell <= 1.5 ? 1 : cell <= 3 ? 2 : cell <= 8 ? 5 : cell <= 20 ? 10 : 20;
+    z = Math.max(9, Math.min(zmax, z));
+    // An interval that suits the cell: one contour per few cells of relief,
+    // so a mountain front at 40 km is a pattern and a pad at 500 m is a plan.
+    var interval = cell <= 1.5 ? 1 : cell <= 3 ? 2 : cell <= 8 ? 5 : cell <= 20 ? 10
+                 : cell <= 60 ? 20 : cell <= 150 ? 50 : 100;
     return { cell: cell, n: Math.round(window_m / cell), z: z, interval: interval, window_m: window_m };
   }
   function focusCheck() {
@@ -2959,7 +2983,7 @@ function gossansStrata() {
         var t = i / n, x = x1 + (x2 - x1) * t, y = y1 + (y2 - y1) * t;
         var z = terrainAt(x, y);
         if (z === null) { prev = null; continue; }
-        var cur = [x, y, z + 25];
+        var cur = [x, y, z + 2];
         if (prev) pts.push(prev[0], prev[1], prev[2], cur[0], cur[1], cur[2]);
         prev = cur;
       }
@@ -3201,7 +3225,7 @@ function gossansStrata() {
   function applyVisible() {
     if (ground) ground.visible = groundMode !== "off";
     heads.forEach(function (h) { h.visible = true; });
-    if (contourLines) contourLines.visible = showContours && isolated < 0;
+    if (contourLines) contourLines.visible = showContours && !padContours;
     if (padContours) padContours.visible = showContours;
     if (gridLines) gridLines.visible = showGrid;
     tops.forEach(function (p) { p.visible = !hidden[p.userData.formation]; });
