@@ -554,6 +554,7 @@ function gossansStrata() {
     rebuild();
     target.set(x, y, (W.ground[wi] === null ? 0 : W.ground[wi]) * EXAG);
     dist = 2500; yaw = NORTH_UP; pitch = 1.0; place();
+    markWell(wi);
     wellCard(wi, pad);
     if (history.replaceState) history.replaceState(null, "", "#well=" + W.api[wi]);
   }
@@ -561,6 +562,7 @@ function gossansStrata() {
   function clearIsolate(redraw) {
     if (isolated < 0 && !padSet) return;
     isolated = -1; padSet = null;
+    unmark();
     setExag(exagBefore);
     var card = document.getElementById("wellcard");
     if (card) { card.hidden = true; card.innerHTML = ""; }
@@ -961,6 +963,7 @@ function gossansStrata() {
     if (patch) root.add(patch);
     if (contourLines) root.add(contourLines);
     if (padContours) root.add(padContours);
+    if (mark) root.add(mark);
     drawLegend();
     applyScale();
     applyVisible();
@@ -1151,6 +1154,58 @@ function gossansStrata() {
   // Asked for a little after the camera stops moving, and only when it has
   // moved far enough or come close enough to need a different window.
   var focus = { key: null, timer: null, loading: null };
+  var mark = null;                       // the isolated well's ring and pin
+
+  function ringTexture() {
+    if (ringTexture.tex) return ringTexture.tex;
+    var c = document.createElement("canvas"), S = 64; c.width = c.height = S;
+    var g = c.getContext("2d");
+    g.lineWidth = 5; g.strokeStyle = "#b7532e";
+    g.beginPath(); g.arc(S / 2, S / 2, 22, 0, Math.PI * 2); g.stroke();
+    g.lineWidth = 2; g.strokeStyle = "#f7f4ef";
+    g.beginPath(); g.arc(S / 2, S / 2, 26, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.arc(S / 2, S / 2, 18, 0, Math.PI * 2); g.stroke();
+    ringTexture.tex = new THREE.CanvasTexture(c);
+    return ringTexture.tex;
+  }
+
+  function markWell(wi) {
+    unmark();
+    if (wi < 0 || !data) return;
+    var W = data.wells, x = W.x[wi], y = W.y[wi], z = W.ground[wi] === null ? 0 : W.ground[wi];
+    mark = new THREE.Group();
+    var rg = new THREE.BufferGeometry();
+    rg.setAttribute("position", new THREE.Float32BufferAttribute([x, y, z], 3));
+    var ring = new THREE.Points(rg, new THREE.PointsMaterial({
+      map: ringTexture(), size: 30, sizeAttenuation: false, transparent: true,
+      alphaTest: 0.04, depthTest: false, depthWrite: false }));
+    ring.renderOrder = 10;
+    mark.add(ring);
+    var pg = new THREE.BufferGeometry();
+    pg.setAttribute("position", new THREE.Float32BufferAttribute([x, y, z, x, y, z], 3));
+    var pin = new THREE.LineSegments(pg, new THREE.LineBasicMaterial({
+      color: 0xb7532e, transparent: true, opacity: 0.9, depthTest: false }));
+    pin.renderOrder = 10;
+    pin.userData = { base: z };
+    mark.add(pin);
+    mark.userData = { wi: wi };
+    root.add(mark);
+    sizeMark();
+  }
+
+  function unmark() {
+    if (mark) { root.remove(mark); mark = null; }
+  }
+
+  // The pin's height follows the view: a fifth of the viewing distance, in
+  // ground metres, so it reads the same from anywhere.
+  function sizeMark() {
+    if (!mark) return;
+    var pin = mark.children[1], a = pin.geometry.getAttribute("position");
+    var h = Math.max(20, dist * 0.2) / Math.max(EXAG, 1);
+    a.setZ(1, pin.userData.base + h);
+    a.needsUpdate = true;
+  }
   function focusSoon() {
     if (focus.timer) clearTimeout(focus.timer);
     focus.timer = setTimeout(focusCheck, 450);
@@ -1735,6 +1790,7 @@ function gossansStrata() {
     camera.lookAt(target);
     orient();
     sizeHeads();
+    sizeMark();
     focusSoon();
   }
 
