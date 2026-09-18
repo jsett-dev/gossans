@@ -908,6 +908,8 @@ header.plate { padding: 40px 0 0; }
             <i class="sw sma"></i> Surface ownership</label>
           <label><input id="lay-model" type="checkbox" checked>
             <i class="sw model"></i> Township model</label>
+          <label><input id="lay-contour" type="checkbox">
+            <i class="sw" style="border-color:#6b6b6b"></i> Contours (50 m)</label>
           <p class="zoomhint" id="zoomhint"></p>
           <h3>Township model</h3>
           <div class="ctlgrp" id="views"></div>
@@ -966,6 +968,9 @@ header.plate { padding: 40px 0 0; }
         </div>
       </div>
       <div class="panel">
+        <div id="wellcard" class="wellcard" hidden></div>
+        <h3 class="withbtn">Wells <span id="wellcount" class="cnt"></span></h3>
+        <div class="filters" id="filters"></div>
         <h3>View</h3>
         <div class="ctlgrp" id="ctl"></div>
         <h3>Layers</h3>
@@ -977,7 +982,8 @@ header.plate { padding: 40px 0 0; }
         <div id="legend" class="legend3d"></div>
         <p class="orient" id="orient"></p>
         <p class="zoomhint">
-          Drag to rotate, scroll to zoom, hold shift to pan. Each mark is a
+          Drag to rotate, scroll to zoom, hold shift to pan. Click a wellhead
+          to isolate that well and its pad. Each mark is a
           formation top at the depth an operator filed for it; each line is a
           wellbore, following its filed survey where one exists and vertical
           where none does. The ground is the USGS bare-earth elevation model
@@ -1212,6 +1218,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       }
     }
     function fromHash(){
+      if (/^#well=/.test(location.hash)) return "surface";
       return location.hash === "#strata" ? "strata"
            : location.hash === "#surface" ? "surface" : "map";
     }
@@ -1351,6 +1358,24 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     bind("lay-qq", groups.qq);
     bind("lay-sma", sma);
     bind("lay-model", groups.model);
+    // Contours are a megabyte or two and are fetched the first time asked for.
+    groups.contour = L.layerGroup();
+    var contoursLoaded = false;
+    bind("lay-contour", groups.contour);
+    document.getElementById("lay-contour").addEventListener("change", function(e){
+      if (!e.target.checked || contoursLoaded) return;
+      contoursLoaded = true;
+      fetch("/data/contours.json").then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(g){
+          if (!g) return;
+          L.geoJSON(g, {style: function(f){
+            return {color:"#6b6b6b", weight: f.properties.index ? 1.1 : 0.5,
+                    opacity: f.properties.index ? 0.7 : 0.45};
+          }, onEachFeature: function(f, l){
+            if (f.properties.index) l.bindTooltip(f.properties.z + " m", {sticky:true});
+          }}).addTo(groups.contour);
+        }).catch(function(){});
+    });
     // The fill goes on first so the survey lines and the wells sit above it.
     [groups.model, groups.twp, groups.sec, groups.qq]
       .forEach(function(g){ map.addLayer(g); });
@@ -1665,6 +1690,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
 .lay3d label { display: flex; align-items: center; gap: 7px; padding: 2px 0;
   cursor: pointer; font-family: var(--f-data); font-size: 11.5px; }
 .lay3d input { flex: none; }
+.lay3d input[type=range] { flex: 1; min-width: 0; }
 /* Formation names drawn over the scene. Each sits at the middle of its own
    tops, so where a layer is not drawn there is no name for it either. */
 .flabels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -1682,6 +1708,34 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
 .credit:empty { display: none; }
 .lay3d select { font: inherit; font-size: 11px; border: 1px solid var(--rule);
   background: var(--paper); color: var(--ink); padding: 2px 4px; }
+.panel .cnt { font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--ink-3); }
+.filters { font-family: var(--f-data); font-size: 11px; }
+.filters details { border-top: 1px solid var(--rule); padding: 4px 0; }
+.filters summary { cursor: pointer; color: var(--ink-2); letter-spacing: .08em;
+  text-transform: uppercase; font-size: 10px; padding: 2px 0; }
+.filters label { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
+.filters label .n { margin-left: auto; color: var(--ink-3); }
+.filters input[type=number], .filters input[type=text], .filters select {
+  font: inherit; font-size: 11px; border: 1px solid var(--rule); background: var(--paper);
+  color: var(--ink); padding: 2px 4px; width: 100%; }
+.filters .row { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
+.filters .row span { color: var(--ink-3); white-space: nowrap; }
+.filters .act { display: flex; gap: 6px; padding: 8px 0 2px; }
+.filters button, .wellcard button { font-family: var(--f-data); font-size: 10px;
+  letter-spacing: .1em; text-transform: uppercase; background: none;
+  border: 1px solid var(--rule); color: var(--ink-2); cursor: pointer; padding: 4px 8px; }
+.filters button.go { background: var(--redline); border-color: var(--redline); color: #fff; }
+.filters button:hover, .wellcard button:hover { color: var(--ink); border-color: var(--redline); }
+.wellcard { border: 1px solid var(--redline); padding: 10px 11px; margin-bottom: 14px;
+  font-family: var(--f-data); font-size: 11px; line-height: 1.55; }
+.wellcard h4 { font-size: 12px; margin: 0 0 4px; color: var(--ink); }
+.wellcard .m { color: var(--ink-3); }
+.wellcard dl { margin: 6px 0; display: grid; grid-template-columns: auto 1fr; gap: 1px 8px; }
+.wellcard dt { color: var(--ink-3); }
+.wellcard dd { margin: 0; }
+.wellcard ul { margin: 4px 0 6px; padding-left: 14px; }
+.wellcard li a { color: var(--ink); cursor: pointer; text-decoration: underline dotted; }
+.wellcard .act { display: flex; gap: 6px; margin-top: 8px; }
 .flabel { position: absolute; transform: translate(-50%, -50%);
   font-family: var(--f-data); font-size: 10px; letter-spacing: .1em;
   text-transform: uppercase; color: var(--ink); background: var(--paper);
@@ -1702,8 +1756,10 @@ function gossansStrata() {
   if (!window.THREE) { fail("The 3D library did not load, so this view cannot draw."); return; }
 
   var EXAG = 15, showPaths = true, onlySurveyed = false, showSurfaces = false;
-  var groundMode = "relief", showGrid = true, showLabels = false;
+  var groundMode = "relief", groundOpacity = 0.85, showGrid = true, showLabels = false;
   var wellheads = null, hasPathArr = null, topsPerWell = null, pendingPreset = null;
+  var filt = null, isolated = -1, padSet = null, patch = null, shownCount = 0;
+  var showContours = false, contourLines = null, contoursDoc = null, padContours = null;
   var hiddenNone = false, labels = [], combine = false;
   var data = null, surf = null, terr = null, plss = null, hidden = {};
   var renderer, scene, camera, root, tops = [], lines = [], meshes = [];
@@ -1768,6 +1824,250 @@ function gossansStrata() {
     document.getElementById("reset").addEventListener("click", home);
   }
 
+  // ---------------------------------------------------------- filters
+  // The facts a well carries, as filed, and a predicate over them. Product
+  // is the one derived thing: which of oil, gas or water a well has mostly
+  // reported, with gas counted at six thousand cubic feet to the barrel.
+  function product(wi) {
+    var W = data.wells, o = W.oil[wi], g = W.gas[wi] / 6, w = W.water[wi];
+    if (!o && !g && !w) return 3;                 // nothing reported
+    if (o >= g && o >= w) return 0;
+    if (g >= o && g >= w) return 1;
+    return 2;                                     // water only, or mostly
+  }
+  var PRODUCTS = ["mostly oil", "mostly gas", "mostly water", "nothing reported"];
+
+  function passes(wi) {
+    var W = data.wells, f = filt;
+    if (f.type && !f.type[W.type[wi]]) return false;
+    if (f.prod && !f.prod[product(wi)]) return false;
+    if (f.traj && W.traj[wi] >= 0 && !f.traj[W.traj[wi]]) return false;
+    if (f.state && !f.state[W.state[wi]]) return false;
+    if (f.first0 && (!W.first[wi] || W.first[wi] < f.first0)) return false;
+    if (f.first1 && (!W.first[wi] || W.first[wi] > f.first1)) return false;
+    if (f.last0 && (!W.last[wi] || W.last[wi] < f.last0)) return false;
+    if (f.oil && W.oil[wi] < f.oil) return false;
+    if (f.gas && W.gas[wi] < f.gas) return false;
+    if (f.op && (data.operators[W.op[wi]] || "").toUpperCase().indexOf(f.op) < 0) return false;
+    if (f.sma !== undefined && f.sma !== null && W.sma[wi] !== f.sma) return false;
+    return true;
+  }
+
+  function counts(key, n) {
+    var W = data.wells, c = new Array(n).fill(0);
+    for (var i = 0; i < W.api.length; i++) {
+      var v = key === "prod" ? product(i) : W[key][i];
+      if (v >= 0 && v < n) c[v]++;
+    }
+    return c;
+  }
+
+  function filters() {
+    var box = document.getElementById("filters");
+    if (!box || !data) return;
+    var W = data.wells;
+    function checks(name, labels, key) {
+      var c = counts(key, labels.length);
+      return '<details><summary>' + name + '</summary>' + labels.map(function (l, i) {
+        return c[i] ? '<label><input type="checkbox" data-f="' + key + '" value="' + i + '" checked> ' +
+               l + '<span class="n">' + c[i].toLocaleString() + '</span></label>' : "";
+      }).join("") + "</details>";
+    }
+    var states = {};
+    W.state.forEach(function (st) { states[st] = (states[st] || 0) + 1; });
+    var years = W.first.filter(function (y) { return y > 0; });
+    var y0 = years.length ? Math.min.apply(null, years) : 1900, y1 = years.length ? Math.max.apply(null, years) : 2030;
+    var ops = data.operators.slice().sort();
+    var smas = data.surface_agencies || [];
+    box.innerHTML =
+      checks("Type", data.types, "type") +
+      checks("Product", PRODUCTS, "prod") +
+      checks("Trajectory", data.trajectories, "traj") +
+      '<details><summary>State</summary>' + Object.keys(states).sort().map(function (st) {
+        return '<label><input type="checkbox" data-f="state" value="' + st + '" checked> ' + st +
+               '<span class="n">' + states[st].toLocaleString() + '</span></label>'; }).join("") + '</details>' +
+      '<details open><summary>Produced</summary>' +
+      '<div class="row"><span>first</span><input type="number" id="f-first0" placeholder="' + y0 + '" min="' + y0 + '" max="' + y1 + '">' +
+      '<span>to</span><input type="number" id="f-first1" placeholder="' + y1 + '" min="' + y0 + '" max="' + y1 + '"></div>' +
+      '<div class="row"><span>still producing in</span><input type="number" id="f-last0" placeholder="any" min="' + y0 + '" max="' + y1 + '"></div>' +
+      '<div class="row"><span>oil &ge;</span><input type="number" id="f-oil" placeholder="0" min="0" step="1000"><span>bbl</span></div>' +
+      '<div class="row"><span>gas &ge;</span><input type="number" id="f-gas" placeholder="0" min="0" step="1000"><span>mcf</span></div>' +
+      '</details>' +
+      '<details open><summary>Company</summary>' +
+      '<input type="text" id="f-op" list="f-ops" placeholder="operator contains&hellip;">' +
+      '<datalist id="f-ops">' + ops.slice(0, 400).map(function (o) { return '<option value="' + o.replace(/"/g, "&quot;") + '">'; }).join("") + '</datalist>' +
+      '</details>' +
+      '<details><summary>Surface</summary>' + (smas.length
+        ? '<select id="f-sma"><option value="">any surface</option>' + smas.map(function (a, i) {
+            return '<option value="' + i + '">' + a + '</option>'; }).join("") + '</select>'
+        : '<span class="m">Surface agency not yet loaded for this region.</span>') +
+      '</details>' +
+      '<div class="act"><button type="button" class="go" id="f-apply">Apply</button>' +
+      '<button type="button" id="f-reset">Reset</button></div>';
+    document.getElementById("f-apply").addEventListener("click", applyFilters);
+    document.getElementById("f-reset").addEventListener("click", function () {
+      filt = null; clearIsolate(false); filters(); rebuild();
+    });
+    box.querySelectorAll("input[type=number], input[type=text]").forEach(function (el) {
+      el.addEventListener("keydown", function (e) { if (e.key === "Enter") applyFilters(); });
+    });
+  }
+
+  function applyFilters() {
+    var box = document.getElementById("filters"), f = {};
+    function set(key) {
+      var boxes = box.querySelectorAll('input[data-f="' + key + '"]');
+      if (!boxes.length) return;
+      var any = false, m = {};
+      boxes.forEach(function (b) { if (b.checked) { m[b.value] = true; any = true; } });
+      if (Object.keys(m).length < boxes.length) f[key] = m;
+    }
+    set("type"); set("prod"); set("traj"); set("state");
+    var num = function (id) { var v = document.getElementById(id).value; return v === "" ? 0 : +v; };
+    f.first0 = num("f-first0"); f.first1 = num("f-first1"); f.last0 = num("f-last0");
+    f.oil = num("f-oil"); f.gas = num("f-gas");
+    f.op = document.getElementById("f-op").value.trim().toUpperCase();
+    var smaSel = document.getElementById("f-sma");
+    f.sma = (smaSel && smaSel.value !== "") ? +smaSel.value : null;
+    filt = f;
+    clearIsolate(false);
+    rebuild();
+  }
+
+  // ---------------------------------------------------------- isolate
+  // One well and its pad: the wells within 250 m of it on the ground. The
+  // camera goes to it, the ground round it wears tiles at pad scale, and the
+  // panel says what the filings hold for it.
+  function isolate(wi) {
+    var W = data.wells, nW = W.api.length;
+    padSet = new Uint8Array(nW);
+    var x = W.x[wi], y = W.y[wi], pad = [];
+    for (var i = 0; i < nW; i++) {
+      var dx = W.x[i] - x, dy = W.y[i] - y;
+      if (dx * dx + dy * dy <= 250 * 250) { padSet[i] = 1; pad.push(i); }
+    }
+    // Fifteen times is right for a basin a hundred kilometres across and
+    // wrong for a pad, where it turns a bench into a cliff. Three, while a
+    // well is isolated, and back to what it was afterwards.
+    if (isolated < 0) exagBefore = EXAG;
+    setExag(3);
+    isolated = wi;
+    if (padContours) { root.remove(padContours); padContours = null; }
+    padDem = { key: null, mesh: null };
+    rebuild();
+    target.set(x, y, (W.ground[wi] === null ? 0 : W.ground[wi]) * EXAG);
+    dist = 4000; pitch = 1.0; place();
+    buildPatch(wi);
+    buildPadGround(wi);
+    wellCard(wi, pad);
+    if (history.replaceState) history.replaceState(null, "", "#well=" + W.api[wi]);
+  }
+
+  function clearIsolate(redraw) {
+    if (isolated < 0 && !padSet) return;
+    isolated = -1; padSet = null;
+    if (patch) { root.remove(patch); patch = null; }
+    if (padContours) { root.remove(padContours); padContours = null; }
+    padDem = { key: null, mesh: null };
+    setExag(exagBefore);
+    var card = document.getElementById("wellcard");
+    if (card) { card.hidden = true; card.innerHTML = ""; }
+    if (redraw !== false) { rebuild(); home(); }
+  }
+
+  function wellCard(wi, pad) {
+    var card = document.getElementById("wellcard");
+    if (!card) return;
+    var W = data.wells, ops = data.operators || [], forms = formationsOf(wi);
+    var smas = data.surface_agencies || [];
+    var yr = function (v) { return v ? v : "\u2014"; };
+    card.innerHTML =
+      "<h4>" + (W.name[wi] || "unnamed") + "</h4>" +
+      '<span class="m">API ' + W.api[wi] + " &middot; " + W.state[wi] + "</span>" +
+      "<dl>" +
+      "<dt>Operator</dt><dd>" + (ops[W.op[wi]] || "\u2014") + "</dd>" +
+      "<dt>Type</dt><dd>" + data.types[W.type[wi]] + (W.traj[wi] >= 0 ? ", " + data.trajectories[W.traj[wi]] : "") + "</dd>" +
+      "<dt>Completed in</dt><dd>" + (forms.length ? forms.join(", ") : "not filed") + "</dd>" +
+      "<dt>Produced</dt><dd>" + yr(W.first[wi]) + " to " + yr(W.last[wi]) + (W.months[wi] ? " (" + W.months[wi] + " months)" : "") + "</dd>" +
+      "<dt>Reported</dt><dd>" + W.oil[wi].toLocaleString() + " bbl oil, " + W.gas[wi].toLocaleString() + " mcf gas, " + W.water[wi].toLocaleString() + " bbl water</dd>" +
+      "<dt>Surface</dt><dd>" + (W.sma[wi] >= 0 ? smas[W.sma[wi]] : "agency not yet loaded") + "</dd>" +
+      "<dt>Ground</dt><dd>" + Math.round(W.ground[wi]).toLocaleString() + " m, " + (W.datum[wi] === 1 ? "from 3DEP" : "as filed") + "</dd>" +
+      "<dt>Tops</dt><dd>" + (topsPerWell[wi] || 0) + " drawn &middot; " + (hasPathArr[wi] ? "survey on file" : "no survey; vertical") + "</dd>" +
+      "</dl>" +
+      (pad.length > 1
+        ? "<b>Pad</b> <span class=\"m\">" + (pad.length - 1) + " other well" + (pad.length > 2 ? "s" : "") + " within 250 m</span><ul>" +
+          pad.filter(function (p) { return p !== wi; }).slice(0, 12).map(function (p) {
+            return '<li><a data-wi="' + p + '">' + (W.name[p] || W.api[p]) + "</a> <span class=\"m\">" + data.types[W.type[p]] + "</span></li>";
+          }).join("") + (pad.length > 13 ? "<li class=\"m\">and " + (pad.length - 13) + " more</li>" : "") + "</ul>"
+        : "<span class=\"m\">No other well within 250 m.</span><br>") +
+      '<span class="m gnote">Ground here is the ' + Math.round(terr ? terr.step_m : 0) + " m grid until the one-metre model answers for this window.</span>" +
+      '<div class="act"><button type="button" id="w-all">Show all wells</button></div>';
+    card.hidden = false;
+    card.querySelectorAll("a[data-wi]").forEach(function (a) {
+      a.addEventListener("click", function () { isolate(+a.getAttribute("data-wi")); });
+    });
+    document.getElementById("w-all").addEventListener("click", function () { clearIsolate(true); });
+  }
+
+  // The ground within about three kilometres of the well, re-draped in
+  // tiles at pad scale so the pad and its access are legible. Same terrain
+  // vertices, a second small mesh, its own tile frame.
+  function buildPatch(wi) {
+    if (patch) { root.remove(patch); patch = null; }
+    if (!terr || groundMode === "off" || groundMode === "relief") return;
+    var W = data.wells, m = metres();
+    var lon = data.origin.lon + W.x[wi] / m.lon, lat = data.origin.lat + W.y[wi] / m.lat;
+    var half = 3000 / m.lat, halfLon = 3000 / m.lon;
+    var i0 = Math.max(0, Math.floor((lon - halfLon - terr.min_lon) / terr.step_lon - 0.5));
+    var i1 = Math.min(terr.nx - 1, Math.ceil((lon + halfLon - terr.min_lon) / terr.step_lon - 0.5));
+    var j0 = Math.max(0, Math.floor((lat - half - terr.min_lat) / terr.step_lat - 0.5));
+    var j1 = Math.min(terr.ny - 1, Math.ceil((lat + half - terr.min_lat) / terr.step_lat - 0.5));
+    if (i1 - i0 < 1 || j1 - j0 < 1) return;
+    var z = 14, n = 1 << z;
+    var a = mercator(terr.min_lon + (i0 + 0.5) * terr.step_lon, terr.min_lat + (j1 + 0.5) * terr.step_lat);
+    var b = mercator(terr.min_lon + (i1 + 0.5) * terr.step_lon, terr.min_lat + (j0 + 0.5) * terr.step_lat);
+    var fr = { z: z, n: n, tx0: Math.floor(a[0] * n), ty0: Math.floor(a[1] * n),
+               tx1: Math.floor(b[0] * n), ty1: Math.floor(b[1] * n) };
+    fr.w = (fr.tx1 - fr.tx0 + 1) * 256; fr.h = (fr.ty1 - fr.ty0 + 1) * 256;
+    var cols = i1 - i0 + 1, rows = j1 - j0 + 1;
+    var pos = new Float32Array(cols * rows * 3), uv = new Float32Array(cols * rows * 2), k = 0;
+    var gpos = ground.geometry.getAttribute("position");
+    for (var j = j0; j <= j1; j++) {
+      for (var i = i0; i <= i1; i++, k++) {
+        var src = j * terr.nx + i;
+        pos[k * 3] = gpos.getX(src); pos[k * 3 + 1] = gpos.getY(src); pos[k * 3 + 2] = gpos.getZ(src) + 2;
+        var mc = mercator(terr.min_lon + (i + 0.5) * terr.step_lon, terr.min_lat + (j + 0.5) * terr.step_lat);
+        uv[k * 2] = (mc[0] * n * 256 - fr.tx0 * 256) / fr.w;
+        uv[k * 2 + 1] = 1 - (mc[1] * n * 256 - fr.ty0 * 256) / fr.h;
+      }
+    }
+    var idx = [];
+    for (var jj = 0; jj < rows - 1; jj++) for (var ii = 0; ii < cols - 1; ii++) {
+      var q = jj * cols + ii;
+      idx.push(q, q + cols, q + 1, q + 1, q + cols, q + cols + 1);
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    var canvas = document.createElement("canvas");
+    canvas.width = fr.w; canvas.height = fr.h;
+    var ctx = canvas.getContext("2d");
+    var tex = new THREE.CanvasTexture(canvas);
+    tex.anisotropy = 4;
+    var bm = BASEMAPS[groundMode];
+    for (var ty = fr.ty0; ty <= fr.ty1; ty++) for (var tx = fr.tx0; tx <= fr.tx1; tx++) (function (tx, ty) {
+      var img = new Image(); img.crossOrigin = "anonymous";
+      img.onload = function () { ctx.drawImage(img, (tx - fr.tx0) * 256, (ty - fr.ty0) * 256); tex.needsUpdate = true; };
+      img.src = bm.url.replace("{z}", fr.z).replace("{x}", tx).replace("{y}", ty);
+    })(tx, ty);
+    patch = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide,
+      transparent: true, opacity: groundOpacity, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    patch.renderOrder = 0;
+    root.add(patch);
+  }
+
   //: every layer in the scene, with the flag it sets and what it is called.
   var LAYERS = [
     {id: "ck", label: "Township grid", get: function () { return showGrid; },
@@ -1776,6 +2076,8 @@ function gossansStrata() {
      set: function (v) { showPaths = v; }},
     {id: "cl", label: "Formation labels", get: function () { return showLabels; },
      set: function (v) { showLabels = v; }},
+    {id: "cc", label: "Contours", get: function () { return showContours; },
+     set: function (v) { showContours = v; if (v) loadContours(); }},
     {id: "cf", label: "Interpolated surfaces", get: function () { return showSurfaces; },
      set: function (v) { showSurfaces = v; }}
   ];
@@ -1803,12 +2105,16 @@ function gossansStrata() {
       return '<option value="' + k + '"' + (k === groundMode ? " selected" : "") + ">" +
              BASEMAPS[k].label + "</option>";
     }).join("") + "</select></label>";
+    sel += '<label>Ground opacity <input id="cgo" type="range" min="0.2" max="1" step="0.05" value="' + groundOpacity + '"></label>';
     box.innerHTML = sel + LAYERS.map(function (L) {
       return '<label><input id="' + L.id + '" type="checkbox"' +
              (L.get() ? " checked" : "") + "> " + L.label + "</label>";
     }).join("");
     document.getElementById("cgm").addEventListener("change", function (e) {
       groundMode = e.target.value; applyGround();
+    });
+    document.getElementById("cgo").addEventListener("input", function (e) {
+      groundOpacity = +e.target.value; applyGround();
     });
     LAYERS.forEach(function (L) {
       document.getElementById(L.id).addEventListener("change", function (e) {
@@ -1825,6 +2131,7 @@ function gossansStrata() {
 
   function build() {
     controls();
+    filters();
     renderer = new THREE.WebGLRenderer({ canvas: host, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     scene = new THREE.Scene();
@@ -1860,6 +2167,20 @@ function gossansStrata() {
     var pp = pendingPreset || window.gossansViews.pendingPreset;
     pendingPreset = null; window.gossansViews.pendingPreset = null;
     if (pp) window.gossansViews.preset3d(pp);
+    // A link straight to a well: #well=<API>, on arrival or later.
+    window.gossansViews.isolate = function (api) {
+      var wi = data.wells.api.indexOf(String(api));
+      if (wi < 0) return false;
+      if (groundMode === "relief" || groundMode === "off") { groundMode = "imagery"; layers(); applyGround(); }
+      isolate(wi);
+      return true;
+    };
+    function fromWellHash() {
+      var mw = /^#well=(\d{10})$/.exec(location.hash);
+      if (mw) window.gossansViews.isolate(mw[1]);
+    }
+    fromWellHash();
+    addEventListener("hashchange", fromWellHash);
     bindCamera();
     renderer.setAnimationLoop(function () {
       renderer.render(scene, camera);
@@ -1918,7 +2239,19 @@ function gossansStrata() {
     var W = data.wells, nW = W.api.length;
     var hasPath = new Uint8Array(nW), pathOf = {};
     data.paths.forEach(function (pr) { hasPath[pr.w] = 1; pathOf[pr.w] = pr.p; });
-    function shown(wi) { return !onlySurveyed || hasPath[wi]; }
+    // What is drawn: an isolated well and its pad, or whatever passes the
+    // filters. The survey-only switch applies on top of either.
+    var pass = new Uint8Array(nW);
+    shownCount = 0;
+    for (var pi = 0; pi < nW; pi++) {
+      var ok = padSet ? !!padSet[pi] : (!filt || passes(pi));
+      if (ok && onlySurveyed && !hasPath[pi]) ok = false;
+      pass[pi] = ok ? 1 : 0;
+      if (ok) shownCount++;
+    }
+    function shown(wi) { return pass[wi] === 1; }
+    var wc = document.getElementById("wellcount");
+    if (wc) wc.textContent = shownCount.toLocaleString() + " of " + nW.toLocaleString();
 
     // Tops, one point cloud per formation so the legend can toggle them.
     var deepest = new Float32Array(nW).fill(Infinity), hasTop = new Uint8Array(nW);
@@ -2028,6 +2361,9 @@ function gossansStrata() {
     // put back afterwards.
     if (ground) root.add(ground); else buildGround();
     if (gridLines) root.add(gridLines); else buildGrid();
+    if (patch) root.add(patch);
+    if (contourLines) root.add(contourLines);
+    if (padContours) root.add(padContours);
     drawLegend();
     applyScale();
     applyVisible();
@@ -2142,6 +2478,199 @@ function gossansStrata() {
     applyGround();
   }
 
+  // ---------------------------------------------------------- contours
+  // Region contours, from the file, at their own height. Index contours
+  // (every fifth) are drawn darker; the rest are faint.
+  function loadContours() {
+    if (contoursDoc || !data) return;
+    contoursDoc = "loading";
+    fetch("/data/contours.json").then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (doc) {
+        contoursDoc = doc;
+        if (!doc) return;
+        var m = metres(), pts = [], cols = [];
+        doc.features.forEach(function (f) {
+          var c = f.geometry.coordinates, z = f.properties.z;
+          var shade = f.properties.index ? 0.30 : 0.62;
+          for (var i = 1; i < c.length; i++) {
+            pts.push((c[i - 1][0] - data.origin.lon) * m.lon, (c[i - 1][1] - data.origin.lat) * m.lat, z + 3,
+                     (c[i][0] - data.origin.lon) * m.lon, (c[i][1] - data.origin.lat) * m.lat, z + 3);
+            cols.push(shade, shade, shade, shade, shade, shade);
+          }
+        });
+        var g = new THREE.BufferGeometry();
+        g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+        g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+        contourLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({
+          vertexColors: true, transparent: true, opacity: 0.8 }));
+        contourLines.userData = { keep: true };
+        root.add(contourLines);
+        applyVisible();
+      }).catch(function () { contoursDoc = null; });
+  }
+
+  // ------------------------------------------------- the ground of a pad
+  // The elevation service answers with an uncompressed tiled float TIFF.
+  // Reading it here is a short parse: one sample per pixel, no compression.
+  function readTiffF32(buf) {
+    var dv = new DataView(buf), le = dv.getUint16(0, true) === 0x4949;
+    var u16 = function (o) { return dv.getUint16(o, le); }, u32 = function (o) { return dv.getUint32(o, le); };
+    var off = u32(4), n = u16(off), tags = {};
+    for (var i = 0; i < n; i++) {
+      var e = off + 2 + i * 12, tag = u16(e), typ = u16(e + 2), cnt = u32(e + 4);
+      var size = typ === 3 ? 2 : 4, vals = [];
+      if (cnt * size <= 4) {
+        for (var k = 0; k < cnt; k++) vals.push(typ === 3 ? u16(e + 8 + k * 2) : u32(e + 8 + k * 4));
+      } else {
+        var ptr = u32(e + 8);
+        for (var k2 = 0; k2 < cnt; k2++) vals.push(typ === 3 ? u16(ptr + k2 * 2) : u32(ptr + k2 * 4));
+      }
+      tags[tag] = vals;
+    }
+    var w = tags[256][0], h = tags[257][0], out = new Float32Array(w * h);
+    if (tags[322]) {
+      var tw = tags[322][0], th = tags[323][0], across = Math.ceil(w / tw);
+      tags[324].forEach(function (o, ti) {
+        var tx = (ti % across) * tw, ty = Math.floor(ti / across) * th;
+        for (var r = 0; r < th; r++) {
+          var y = ty + r; if (y >= h) break;
+          for (var c = 0; c < tw; c++) {
+            var x = tx + c; if (x >= w) break;
+            out[y * w + x] = dv.getFloat32(o + (r * tw + c) * 4, le);
+          }
+        }
+      });
+    } else {
+      var rps = (tags[278] || [h])[0];
+      tags[273].forEach(function (o, si) {
+        var base = si * rps * w, cnt2 = tags[279][si] / 4;
+        for (var k3 = 0; k3 < cnt2 && base + k3 < out.length; k3++) out[base + k3] = dv.getFloat32(o + k3 * 4, le);
+      });
+    }
+    return { w: w, h: h, z: out };
+  }
+
+  var padDem = { key: null, mesh: null };
+  function buildPadGround(wi) {
+    if (!terr) return;
+    var W = data.wells, m = metres(), cell = 8, half = 3000;
+    var lon = data.origin.lon + W.x[wi] / m.lon, lat = data.origin.lat + W.y[wi] / m.lat;
+    var stepLat = cell / m.lat, stepLon = cell / m.lon;
+    var nx = Math.round(2 * half / cell), ny = nx;
+    var lon0 = lon - nx / 2 * stepLon, lat0 = lat - ny / 2 * stepLat;
+    var key = wi;
+    if (padDem.key === key && padDem.mesh) return;
+    var url = "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer/exportImage?" +
+      "bbox=" + [lon0, lat0, lon0 + nx * stepLon, lat0 + ny * stepLat].join(",") +
+      "&bboxSR=4326&imageSR=4326&size=" + nx + "," + ny + "&format=tiff&pixelType=F32" +
+      "&interpolation=RSP_BilinearInterpolation&f=image";
+    fetch(url).then(function (r) { return r.ok ? r.arrayBuffer() : null; }).then(function (buf) {
+      if (!buf || isolated !== wi) return;
+      var t = readTiffF32(buf);
+      if (t.w !== nx || t.h !== ny) return;
+      // Rows arrive north-first; the grid counts north-up.
+      var pos = new Float32Array(nx * ny * 3), grid = new Float32Array(nx * ny);
+      for (var j = 0; j < ny; j++) for (var i = 0; i < nx; i++) {
+        var z = t.z[(ny - 1 - j) * nx + i];
+        if (!(z > -500 && z < 4500)) z = NaN;
+        grid[j * nx + i] = z;
+        var k = j * nx + i;
+        pos[k * 3] = (lon0 + (i + 0.5) * stepLon - data.origin.lon) * m.lon;
+        pos[k * 3 + 1] = (lat0 + (j + 0.5) * stepLat - data.origin.lat) * m.lat;
+        pos[k * 3 + 2] = isNaN(z) ? 0 : z + 1;
+      }
+      var idx = [];
+      for (var jj = 0; jj < ny - 1; jj++) for (var ii = 0; ii < nx - 1; ii++) {
+        var q = jj * nx + ii;
+        if (isNaN(grid[q]) || isNaN(grid[q + 1]) || isNaN(grid[q + nx]) || isNaN(grid[q + nx + 1])) continue;
+        idx.push(q, q + nx, q + 1, q + 1, q + nx, q + nx + 1);
+      }
+      // The pad ground replaces the coarse patch: same tiles, real relief.
+      if (patch) { root.remove(patch); patch = null; }
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      g.setIndex(idx);
+      var uv = padUv(lon0, lat0, stepLon, stepLat, nx, ny);
+      g.setAttribute("uv", new THREE.BufferAttribute(uv.arr, 2));
+      patch = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: uv.tex, side: THREE.DoubleSide,
+        transparent: true, opacity: groundOpacity, depthWrite: false,
+        polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      patch.renderOrder = 0;
+      root.add(patch);
+      padDem = { key: key, mesh: patch };
+      buildPadContours(grid, nx, ny, lon0, lat0, stepLon, stepLat, 2);
+      var card = document.getElementById("wellcard");
+      var note = card && card.querySelector(".gnote");
+      if (note) note.textContent = "Ground within 3 km is the one-metre model at " + cell + " m, with contours at 2 m. Roads and the pad are in the imagery.";
+    }).catch(function () {});
+  }
+
+  // Tiles for the pad window at z14, as a texture and the UVs to fit it.
+  function padUv(lon0, lat0, stepLon, stepLat, nx, ny) {
+    var z = 14, n = 1 << z;
+    var a = mercator(lon0, lat0 + ny * stepLat), b = mercator(lon0 + nx * stepLon, lat0);
+    var fr = { tx0: Math.floor(a[0] * n), ty0: Math.floor(a[1] * n), tx1: Math.floor(b[0] * n), ty1: Math.floor(b[1] * n) };
+    fr.w = (fr.tx1 - fr.tx0 + 1) * 256; fr.h = (fr.ty1 - fr.ty0 + 1) * 256;
+    var arr = new Float32Array(nx * ny * 2);
+    for (var j = 0; j < ny; j++) for (var i = 0; i < nx; i++) {
+      var mc = mercator(lon0 + (i + 0.5) * stepLon, lat0 + (j + 0.5) * stepLat), k = j * nx + i;
+      arr[k * 2] = (mc[0] * n * 256 - fr.tx0 * 256) / fr.w;
+      arr[k * 2 + 1] = 1 - (mc[1] * n * 256 - fr.ty0 * 256) / fr.h;
+    }
+    var canvas = document.createElement("canvas");
+    canvas.width = fr.w; canvas.height = fr.h;
+    var ctx = canvas.getContext("2d"), tex = new THREE.CanvasTexture(canvas);
+    tex.anisotropy = 4;
+    var bm = BASEMAPS[groundMode === "relief" || groundMode === "off" ? "imagery" : groundMode];
+    for (var ty = fr.ty0; ty <= fr.ty1; ty++) for (var tx = fr.tx0; tx <= fr.tx1; tx++) (function (tx, ty) {
+      var img = new Image(); img.crossOrigin = "anonymous";
+      img.onload = function () { ctx.drawImage(img, (tx - fr.tx0) * 256, (ty - fr.ty0) * 256); tex.needsUpdate = true; };
+      img.src = bm.url.replace("{z}", z).replace("{x}", tx).replace("{y}", ty);
+    })(tx, ty);
+    return { arr: arr, tex: tex };
+  }
+
+  // Marching squares over the pad grid, one level at a time.
+  function buildPadContours(grid, nx, ny, lon0, lat0, stepLon, stepLat, interval) {
+    if (padContours) { root.remove(padContours); padContours = null; }
+    var m = metres(), pts = [], cols = [];
+    var lo = Infinity, hi = -Infinity;
+    for (var q = 0; q < grid.length; q++) { var v = grid[q]; if (!isNaN(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } }
+    if (!(hi > lo)) return;
+    function X(i) { return (lon0 + (i + 0.5) * stepLon - data.origin.lon) * m.lon; }
+    function Y(j) { return (lat0 + (j + 0.5) * stepLat - data.origin.lat) * m.lat; }
+    for (var level = Math.ceil(lo / interval) * interval; level <= hi; level += interval) {
+      var shade = (level % (interval * 5) === 0) ? 0.25 : 0.55;
+      for (var j = 0; j < ny - 1; j++) for (var i = 0; i < nx - 1; i++) {
+        var a = grid[j * nx + i], b = grid[j * nx + i + 1], c = grid[(j + 1) * nx + i + 1], d = grid[(j + 1) * nx + i];
+        if (isNaN(a) || isNaN(b) || isNaN(c) || isNaN(d)) continue;
+        var idx = (a >= level ? 1 : 0) | (b >= level ? 2 : 0) | (c >= level ? 4 : 0) | (d >= level ? 8 : 0);
+        if (idx === 0 || idx === 15) continue;
+        var e = {};
+        if ((a >= level) !== (b >= level)) { var t1 = (level - a) / (b - a); e.b = [X(i + t1), Y(j)]; }
+        if ((b >= level) !== (c >= level)) { var t2 = (level - b) / (c - b); e.r = [X(i + 1), Y(j + t2)]; }
+        if ((d >= level) !== (c >= level)) { var t3 = (level - d) / (c - d); e.t = [X(i + t3), Y(j + 1)]; }
+        if ((a >= level) !== (d >= level)) { var t4 = (level - a) / (d - a); e.l = [X(i), Y(j + t4)]; }
+        var pairs = {1: [["l", "b"]], 2: [["b", "r"]], 3: [["l", "r"]], 4: [["r", "t"]], 5: [["l", "t"], ["b", "r"]],
+                     6: [["b", "t"]], 7: [["l", "t"]], 8: [["t", "l"]], 9: [["b", "t"]], 10: [["l", "b"], ["t", "r"]],
+                     11: [["r", "t"]], 12: [["l", "r"]], 13: [["b", "r"]], 14: [["l", "b"]]}[idx];
+        pairs.forEach(function (pr) {
+          var p0 = e[pr[0]], p1 = e[pr[1]];
+          if (!p0 || !p1) return;
+          pts.push(p0[0], p0[1], level + 1.5, p1[0], p1[1], level + 1.5);
+          cols.push(shade, shade, shade, shade, shade, shade);
+        });
+      }
+    }
+    if (!pts.length) return;
+    var g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+    g.setAttribute("color", new THREE.Float32BufferAttribute(cols, 3));
+    padContours = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85 }));
+    root.add(padContours);
+    applyVisible();
+  }
+
   // ---------------------------------------------------------- basemaps
   function mercator(lon, lat) {
     var sn = Math.sin(lat * Math.PI / 180);
@@ -2202,12 +2731,15 @@ function gossansStrata() {
     var g = ground.geometry, m = ground.material;
     if (groundMode === "relief") {
       g.setAttribute("color", g.userData.ramp);
-      m.map = null; m.opacity = 0.72;
+      m.map = null;
     } else {
       g.setAttribute("color", g.userData.shade);
-      m.map = loadBasemap(groundMode); m.opacity = 0.94;
+      m.map = loadBasemap(groundMode);
     }
+    m.opacity = groundOpacity;
+    if (patch) patch.material.opacity = groundOpacity;
     m.needsUpdate = true;
+    if (isolated >= 0) buildPatch(isolated);
   }
 
   // The survey grid, laid on the ground rather than floating over it. Each
@@ -2449,10 +2981,20 @@ function gossansStrata() {
   }
 
   function applyScale() { root.scale.set(1, 1, EXAG); }
+  var exagBefore = 15;
+  function setExag(v) {
+    EXAG = v;
+    var ex = document.getElementById("ex"), exv = document.getElementById("exv");
+    if (ex) ex.value = v;
+    if (exv) exv.innerHTML = v + "&times;";
+    applyScale();
+  }
 
   function applyVisible() {
     if (ground) ground.visible = groundMode !== "off";
     if (wellheads) wellheads.visible = true;
+    if (contourLines) contourLines.visible = showContours && isolated < 0;
+    if (padContours) padContours.visible = showContours;
     if (gridLines) gridLines.visible = showGrid;
     tops.forEach(function (p) { p.visible = !hidden[p.userData.formation]; });
     lines.forEach(function (l) {
@@ -2524,6 +3066,13 @@ function gossansStrata() {
       lat.toFixed(4) + "&deg;N " + Math.abs(lon).toFixed(4) + "&deg;W";
   }
   function home() {
+    // While a well is isolated, home is the well, not the basin.
+    if (isolated >= 0 && data) {
+      var W = data.wells;
+      target.set(W.x[isolated], W.y[isolated], (W.ground[isolated] || 0) * EXAG);
+      dist = 4000; pitch = 1.0; place();
+      return;
+    }
     var box = new THREE.Box3().setFromObject(root);
     if (box.isEmpty()) return;
     box.getCenter(target);
@@ -2541,13 +3090,24 @@ function gossansStrata() {
     var down = null;
     host.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     host.addEventListener("pointerdown", function (e) {
-      down = { x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2 };
+      down = { x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 2,
+               x0: e.clientX, y0: e.clientY, moved: false };
       host.setPointerCapture(e.pointerId);
+    });
+    // A press that did not drag is a click, and a click on a wellhead or a
+    // top isolates that well.
+    host.addEventListener("pointerup", function (e) {
+      if (!down || down.moved || e.button !== 0) return;
+      var r = host.getBoundingClientRect();
+      mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      var hit = pickHit();
+      if (hit) isolate(hit.wi);
     });
     host.addEventListener("pointermove", function (e) {
       if (!down) return;
       var dx = e.clientX - down.x, dy = e.clientY - down.y;
       down.x = e.clientX; down.y = e.clientY;
+      if (Math.abs(e.clientX - down.x0) + Math.abs(e.clientY - down.y0) > 4) down.moved = true;
       if (down.pan) {
         // Pan along the camera's own right and up axes. The previous version
         // derived them from yaw by hand and had both horizontal terms
@@ -2617,16 +3177,24 @@ function gossansStrata() {
       (W.datum[wi] === 1 ? "from 3DEP" : "as filed") + "</span>";
   }
 
-  function pick(px, py) {
-    var tip = document.getElementById("tip");
-    if (!tip || !data) return;
+  function pickHit() {
+    if (!data || !camera) return null;
     raycaster.setFromCamera(mouse, camera);
     raycaster.params.Points.threshold = Math.max(40, dist * 0.005);
     var targets = tops.filter(function (p) { return p.visible; });
     if (wellheads) targets.push(wellheads);
     var hits = raycaster.intersectObjects(targets, false);
-    if (!hits.length) { tip.style.display = "none"; return; }
-    var h = hits[0], ud = h.object.userData, html;
+    if (!hits.length) return null;
+    var h = hits[0], ud = h.object.userData;
+    return { h: h, ud: ud, wi: ud.wi[h.index] };
+  }
+
+  function pick(px, py) {
+    var tip = document.getElementById("tip");
+    if (!tip || !data) return;
+    var got = pickHit();
+    if (!got) { tip.style.display = "none"; return; }
+    var h = got.h, ud = got.ud, html;
     if (ud.heads) {
       html = wellHtml(ud.wi[h.index]);
     } else {

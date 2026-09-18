@@ -61,6 +61,8 @@ BODY = r"""
             <i class="sw sma"></i> Surface ownership</label>
           <label><input id="lay-model" type="checkbox" checked>
             <i class="sw model"></i> Township model</label>
+          <label><input id="lay-contour" type="checkbox">
+            <i class="sw" style="border-color:#6b6b6b"></i> Contours (50 m)</label>
           <p class="zoomhint" id="zoomhint"></p>
           <h3>Township model</h3>
           <div class="ctlgrp" id="views"></div>
@@ -315,6 +317,7 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       }
     }
     function fromHash(){
+      if (/^#well=/.test(location.hash)) return "surface";
       return location.hash === "#strata" ? "strata"
            : location.hash === "#surface" ? "surface" : "map";
     }
@@ -454,6 +457,24 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     bind("lay-qq", groups.qq);
     bind("lay-sma", sma);
     bind("lay-model", groups.model);
+    // Contours are a megabyte or two and are fetched the first time asked for.
+    groups.contour = L.layerGroup();
+    var contoursLoaded = false;
+    bind("lay-contour", groups.contour);
+    document.getElementById("lay-contour").addEventListener("change", function(e){
+      if (!e.target.checked || contoursLoaded) return;
+      contoursLoaded = true;
+      fetch("/data/contours.json").then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(g){
+          if (!g) return;
+          L.geoJSON(g, {style: function(f){
+            return {color:"#6b6b6b", weight: f.properties.index ? 1.1 : 0.5,
+                    opacity: f.properties.index ? 0.7 : 0.45};
+          }, onEachFeature: function(f, l){
+            if (f.properties.index) l.bindTooltip(f.properties.z + " m", {sticky:true});
+          }}).addTo(groups.contour);
+        }).catch(function(){});
+    });
     // The fill goes on first so the survey lines and the wells sit above it.
     [groups.model, groups.twp, groups.sec, groups.qq]
       .forEach(function(g){ map.addLayer(g); });
