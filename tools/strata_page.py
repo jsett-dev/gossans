@@ -1033,8 +1033,10 @@ function gossansStrata() {
       var lat = function (yy) { return Math.atan(Math.sinh(Math.PI * (1 - 2 * yy / n))) * 180 / Math.PI; };
       return { lon0: x / n * 360 - 180, lon1: (x + 1) / n * 360 - 180, lat0: lat(y + 1), lat1: lat(y) };
     }
+    // Each step a multiple of the finer one, so a coarse tile's every
+    // contour continues into its finer neighbour.
     function intervalFor(z) {
-      return z <= 9 ? 100 : z <= 10 ? 50 : z <= 12 ? 20 : z <= 14 ? 10 : z <= 16 ? 5 : z <= 17 ? 2 : 1;
+      return z <= 10 ? 100 : z <= 12 ? 20 : z <= 14 ? 10 : z <= 16 ? 2 : 1;
     }
 
     function makeTile(z, x, y, parent) {
@@ -1129,7 +1131,7 @@ function gossansStrata() {
       var node = new THREE.Group();
       node.add(mesh);
       node.userData = { mesh: mesh, lines: null, drop: drop };
-      t.dem = dem; t.zmin = lo; t.zmax = hi; t.node = node; t.state = "ready";
+      t.dem = dem; t.sdem = new Float32Array(dem); t.zmin = lo; t.zmax = hi; t.node = node; t.state = "ready";
       node.visible = false;
       group.add(node);
       buildContours(t);
@@ -1140,7 +1142,12 @@ function gossansStrata() {
 
     // ---- contours per tile, by marching squares over its own DEM
     function buildContours(t) {
-      var N = TILE_N, dem = t.dem, b = t.b, dlon = (b.lon1 - b.lon0) / (N - 1), dlat = (b.lat1 - b.lat0) / (N - 1);
+      if (t.node.userData.lines) {
+        t.node.remove(t.node.userData.lines);
+        t.node.userData.lines.geometry.dispose();
+        t.node.userData.lines = null;
+      }
+      var N = TILE_N, dem = t.sdem || t.dem, b = t.b, dlon = (b.lon1 - b.lon0) / (N - 1), dlat = (b.lat1 - b.lat0) / (N - 1);
       var interval = intervalFor(t.z), pts = [], cols = [];
       function X(i) { return (b.lon0 + i * dlon - data.origin.lon) * m.lon; }
       function Y(j) { return (b.lat0 + j * dlat - data.origin.lat) * m.lat; }
@@ -1409,13 +1416,14 @@ function gossansStrata() {
             }
             if (Math.abs(p.getZ(vi) - z) > 1e-3) {
               p.setZ(vi, z);
+              t.sdem[vi] = z;
               var slot = side === "s" ? i : side === "e" ? N + i : side === "n" ? 2 * N + (N - 1 - i) : 3 * N + (N - 1 - i);
               p.setZ(sk + slot, z - t.node.userData.drop);
               changed = true;
             }
           }
         });
-        if (changed) p.needsUpdate = true;
+        if (changed) { p.needsUpdate = true; buildContours(t); }
       });
     }
     var schedTimer = null;
