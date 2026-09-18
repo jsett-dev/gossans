@@ -1802,9 +1802,7 @@ function gossansStrata() {
       '<button class="ctl" id="reset" type="button">Reset view</button>';
     layers();
     document.getElementById("ex").addEventListener("input", function (e) {
-      EXAG = +e.target.value;
-      document.getElementById("exv").innerHTML = EXAG + "&times;";
-      applyScale();
+      setExag(+e.target.value);
     });
     document.getElementById("cs").addEventListener("change", function (e) {
       onlySurveyed = e.target.checked; rebuild();
@@ -3133,11 +3131,16 @@ function gossansStrata() {
   function applyScale() { root.scale.set(1, 1, EXAG); }
   var exagBefore = 15;
   function setExag(v) {
+    // The point the camera looks at is stored in stretched units, so when
+    // the stretch changes the point has to move with the ground it is on,
+    // or a wellhead in the centre of the screen slides off it.
+    if (EXAG) target.z *= v / EXAG;
     EXAG = v;
     var ex = document.getElementById("ex"), exv = document.getElementById("exv");
     if (ex) ex.value = v;
     if (exv) exv.innerHTML = v + "&times;";
     applyScale();
+    if (camera) place();
   }
 
   function applyVisible() {
