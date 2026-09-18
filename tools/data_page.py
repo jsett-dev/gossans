@@ -11,8 +11,8 @@ TITLE = "What is in the store, and where it runs out"
 
 DESCRIPTION = (
     "Every record behind this site: how many, from which public source, under "
-    "what licence, and the coverage gaps. Built from Wyoming and federal "
-    "filings."
+    "what licence, and the coverage gaps. Built from Wyoming, Montana and "
+    "federal filings."
 )
 
 BODY = r"""
@@ -124,7 +124,7 @@ SCRIPT = r"""
       }).join("");
     el("covnote").textContent =
       "Of " + n(d.wells) + " wells held. Coverage is what the filings contain, " +
-      "not what was collected: where a share is low, the state's record is thin.";
+      "not what was collected: where a share is low, the states' records are thin.";
 
     el("sources").innerHTML = d.sources.map(function (s) {
       return "<div class='srcbox'><h3>" + s.name +

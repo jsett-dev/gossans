@@ -10,7 +10,7 @@ invents structure and the invention disappears the moment it is coloured in.
 TITLE = "The Powder River Basin, as far as the public record actually knows it"
 
 DESCRIPTION = (
-    "An interactive model of Campbell and Converse counties built from Wyoming's "
+    "An interactive model of the Powder River Basin, Wyoming and Montana, built from the states' "
     "own filings: structure, recovery and completion intensity by township and "
     "range, with every gap in the record left visible."
 )
@@ -26,7 +26,7 @@ BODY = r"""
     <div class="crumb">Model &middot; Powder River Basin</div>
     <h1>Most basin maps are confident where the data is not.</h1>
     <p class="standfirst">
-      This one is built from Wyoming's own filings and nothing else. Where there
+      This one is built from Wyoming's and Montana's own filings and nothing else. Where there
       are no wells there is no colour, because a smooth surface drawn across an
       empty township is an invention that becomes invisible the moment it is
       shaded in. Every cell carries the number of wells behind it.
@@ -495,7 +495,9 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     if (typeof L === "undefined") { return setTimeout(startMap, 200); }
     // Wheel zoom on, to match the 3D view on the same page. Leaflet
     // already pans by dragging.
-    lmap = L.map("leaflet", {scrollWheelZoom:true});
+    // Canvas rather than SVG for the markers: fifty thousand wells as SVG
+    // circles is fifty thousand DOM nodes, and the map stops answering.
+    lmap = L.map("leaflet", {scrollWheelZoom:true, preferCanvas:true});
     window.gossansViews = window.gossansViews || {};
     window.gossansViews.map = lmap;
     cadastral(lmap);

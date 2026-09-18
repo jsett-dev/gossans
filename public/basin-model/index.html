@@ -4,21 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Powder River Basin, as far as the public record actually knows it | Gossans</title>
-<meta name="description" content="An interactive model of Campbell and Converse counties built from Wyoming's own filings: structure, recovery and completion intensity by township and range, with every gap in the record left visible.">
+<meta name="description" content="An interactive model of the Powder River Basin, Wyoming and Montana, built from the states' own filings: structure, recovery and completion intensity by township and range, with every gap in the record left visible.">
 <link rel="canonical" href="https://www.gossans.com/basin-model/">
 
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Gossans">
 <meta property="og:url" content="https://www.gossans.com/basin-model/">
 <meta property="og:title" content="The Powder River Basin, as far as the public record actually knows it | Gossans">
-<meta property="og:description" content="An interactive model of Campbell and Converse counties built from Wyoming's own filings: structure, recovery and completion intensity by township and range, with every gap in the record left visible.">
+<meta property="og:description" content="An interactive model of the Powder River Basin, Wyoming and Montana, built from the states' own filings: structure, recovery and completion intensity by township and range, with every gap in the record left visible.">
 <meta property="og:image" content="https://www.gossans.com/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://www.gossans.com/og-image.png">
 <meta name="twitter:title" content="The Powder River Basin, as far as the public record actually knows it | Gossans">
-<meta name="twitter:description" content="An interactive model of Campbell and Converse counties built from Wyoming's own filings: structure, recovery and completion intensity by township and range, with every gap in the record left visible.">
+<meta name="twitter:description" content="An interactive model of the Powder River Basin, Wyoming and Montana, built from the states' own filings: structure, recovery and completion intensity by township and range, with every gap in the record left visible.">
 
 <meta name="theme-color" content="#f1f2ef" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14181a" media="(prefers-color-scheme: dark)">
@@ -873,7 +873,7 @@ header.plate { padding: 40px 0 0; }
     <div class="crumb">Model &middot; Powder River Basin</div>
     <h1>Most basin maps are confident where the data is not.</h1>
     <p class="standfirst">
-      This one is built from Wyoming's own filings and nothing else. Where there
+      This one is built from Wyoming's and Montana's own filings and nothing else. Where there
       are no wells there is no colour, because a smooth surface drawn across an
       empty township is an invention that becomes invisible the moment it is
       shaded in. Every cell carries the number of wells behind it.
@@ -968,6 +968,8 @@ header.plate { padding: 40px 0 0; }
         <div class="lay3d" id="layers3d"></div>
         <h3 class="withbtn">Strata
           <button type="button" id="allstrata">Hide all</button></h3>
+        <label class="lay3d"><input id="cu" type="checkbox">
+          Combine benches into units</label>
         <div id="legend" class="legend3d"></div>
         <p class="orient" id="orient"></p>
         <p class="zoomhint">
@@ -975,7 +977,8 @@ header.plate { padding: 40px 0 0; }
           formation top at the depth an operator filed for it; each line is a
           wellbore, following its filed survey where one exists and vertical
           where none does. The ground is the USGS bare-earth elevation model
-          on a 400&nbsp;m grid, with the township lines laid on it. Every
+          on a <span class="t-step">&hellip;</span> grid, with the township
+          lines laid on it. Every
           switch that changes what is drawn is in the legend below.
         </p>
       </div>
@@ -1385,7 +1388,9 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
     if (typeof L === "undefined") { return setTimeout(startMap, 200); }
     // Wheel zoom on, to match the 3D view on the same page. Leaflet
     // already pans by dragging.
-    lmap = L.map("leaflet", {scrollWheelZoom:true});
+    // Canvas rather than SVG for the markers: fifty thousand wells as SVG
+    // circles is fifty thousand DOM nodes, and the map stops answering.
+    lmap = L.map("leaflet", {scrollWheelZoom:true, preferCanvas:true});
     window.gossansViews = window.gossansViews || {};
     window.gossansViews.map = lmap;
     cadastral(lmap);
@@ -1550,18 +1555,20 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
         subject seen twice - what a well passed through and what it was
         perforated in - and having them on separate switches meant a layer
         could be turned off while the wells producing from it stayed on the
-        screen. Completions come from the filed producing intervals: 2,410
-        wells are matched to a formation drawn here, 100 have no producing
-        formation on file, and 38 produce from something this view does not
-        draw because too few tops were filed for it. The last two groups are
-        not folded in with the rest; they have their own row, so no switch
-        claims to control more than it does.
+        screen. Completions come from the filed producing intervals:
+        <b id="c-prod">&hellip;</b> wells are matched to a formation drawn
+        here, <b id="c-multi">&hellip;</b> of them completed in more than one,
+        <b id="c-none">&hellip;</b> have no producing formation on file, and
+        <b id="c-notdrawn">&hellip;</b> produce from something this view does
+        not draw because too few tops were filed for it. The last two groups
+        are not folded in with the rest; they have their own row, so no
+        switch claims to control more than it does.
       </p>
       <p>
         The ground surface is the one surface here that is not an inference.
         It is the U.S. Geological Survey's bare-earth elevation model, built
         largely from airborne lidar and served at one metre, resampled onto a
-        400&nbsp;m grid because what it is wanted for is a datum under a
+        <span class="t-step">&hellip;</span> grid because what it is wanted for is a datum under a
         column of formation tops rather than a terrain analysis. Bare earth
         means the ground, not the trees or the buildings on it, and anything
         needing the real resolution should go to
@@ -1570,11 +1577,12 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
       </p>
       <p>
         Having a measured ground makes the filings checkable against it. Well
-        by well, across the 2,446 wells with both a filed elevation and a grid
-        cell under them, the two agree in the middle and not in the tails: the
-        median difference is 0.6&nbsp;m, the quartiles are &minus;49&nbsp;m and
-        +31&nbsp;m, and <b>394 wells differ by more than 100&nbsp;m</b>. A
-        hundred metres is not a survey error. In those wells either the filed
+        by well, across the <b id="e-n">&hellip;</b> wells with both a filed
+        elevation and a grid cell under them, the two agree in the middle and
+        not in the tails: the median difference is <b id="e-med">&hellip;</b>,
+        the quartiles are <b id="e-q1">&hellip;</b> and <b id="e-q3">&hellip;</b>,
+        and <b><span id="e-big">&hellip;</span> wells differ by more than
+        100&nbsp;m</b>. A hundred metres is not a survey error. In those wells either the filed
         elevation or the surface coordinate the well is mapped at is wrong,
         and this site does not yet know which; the disagreement tracks neither
         survey coverage nor lateral length. They are drawn anyway, because
@@ -1584,9 +1592,9 @@ ul.unknown li::before { content:"\2014"; position:absolute; left:0;
         Each wellbore hangs from the elevation filed with its own tops rather
         than from this grid, even where the two disagree, because that is the
         datum those tops were computed from and a well has to be internally
-        consistent before it is consistent with anything else. Seventy-one
-        wells had no usable filed elevation and hang from the 3DEP ground
-        instead.
+        consistent before it is consistent with anything else.
+        <b id="e-3dep">&hellip;</b> wells had no usable filed elevation and
+        hang from the 3DEP ground instead.
       </p>
       <p>
         The township lines on that surface are the Bureau of Land Management's
@@ -1665,7 +1673,7 @@ function gossansStrata() {
 
   var EXAG = 15, showPaths = true, onlySurveyed = false, showSurfaces = false;
   var showGround = true, showGrid = true, showLabels = true;
-  var hiddenNone = false, labels = [];
+  var hiddenNone = false, labels = [], combine = false;
   var data = null, surf = null, terr = null, plss = null, hidden = {};
   var renderer, scene, camera, root, tops = [], lines = [], meshes = [];
   var ground = null, gridLines = null;
@@ -1712,6 +1720,10 @@ function gossansStrata() {
     });
     document.getElementById("cs").addEventListener("change", function (e) {
       onlySurveyed = e.target.checked; rebuild();
+    });
+    var cu = document.getElementById("cu");
+    if (cu) cu.addEventListener("change", function (e) {
+      combine = e.target.checked; drawLegend();
     });
     document.getElementById("allstrata").addEventListener("click", function () {
       // Hiding every formation leaves the wellbores, which is the useful
@@ -1783,6 +1795,31 @@ function gossansStrata() {
 
     var c = data.counts;
     document.getElementById("nsurv").textContent = c.not_surveyed.toLocaleString();
+    // The prose quotes the counts rather than carrying numbers that go
+    // stale the first time the region or the filings change.
+    [["c-prod", c.wells_with_producing_formation],
+     ["c-multi", c.wells_completed_in_more_than_one_formation],
+     ["c-none", c.wells_with_no_producing_formation_filed],
+     ["c-notdrawn", c.wells_producing_from_a_formation_not_drawn]
+    ].forEach(function (pair) {
+      var el = document.getElementById(pair[0]);
+      if (el && pair[1] !== undefined) el.textContent = pair[1].toLocaleString();
+    });
+    if (terr && terr.step_m) {
+      var stepTxt = Math.round(terr.step_m) + " m";
+      Array.prototype.forEach.call(document.querySelectorAll(".t-step"),
+        function (el) { el.textContent = stepTxt; });
+    }
+    var ec = c.elevation_check || {};
+    function m(v) { return v === null || v === undefined ? "?" : (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(0) + " m"; }
+    [["e-n", (ec.wells || 0).toLocaleString()], ["e-med", m(ec.median_m)],
+     ["e-q1", m(ec.q1_m)], ["e-q3", m(ec.q3_m)],
+     ["e-big", (ec.beyond_100_m || 0).toLocaleString()],
+     ["e-3dep", (c.datum_3dep || 0).toLocaleString()]
+    ].forEach(function (pair) {
+      var el = document.getElementById(pair[0]);
+      if (el) el.textContent = pair[1];
+    });
     note.textContent = "Generated " + data.generated + " from " +
       c.tops.toLocaleString() + " filed formation tops across " +
       c.wells.toLocaleString() + " wells. " + c.surveyed.toLocaleString() +
@@ -1802,16 +1839,25 @@ function gossansStrata() {
   function rebuild() {
     while (root.children.length) root.remove(root.children[0]);
     tops = []; lines = [];
-    var wells = data.wells.filter(function (w) { return !onlySurveyed || w.surveyed; });
+    // Format 2: parallel arrays by well index, tops per formation, paths for
+    // the surveyed few. One object per well was a megabyte for two and a
+    // half thousand wells; the region has fifty thousand.
+    var W = data.wells, nW = W.api.length;
+    var hasPath = new Uint8Array(nW), pathOf = {};
+    data.paths.forEach(function (pr) { hasPath[pr.w] = 1; pathOf[pr.w] = pr.p; });
+    function shown(wi) { return !onlySurveyed || hasPath[wi]; }
 
     // Tops, one point cloud per formation so the legend can toggle them.
+    var deepest = new Float32Array(nW).fill(Infinity), hasTop = new Uint8Array(nW);
     data.formations.forEach(function (f, fi) {
-      var pts = [];
-      wells.forEach(function (w) {
-        w.tops.forEach(function (t) {
-          if (t[0] === fi && t[2] !== null) pts.push(w.x, w.y, t[2]);
-        });
-      });
+      var T = data.tops[fi], pts = [];
+      for (var i = 0; i < T.w.length; i++) {
+        var wi = T.w[i], z = T.z[i];
+        if (z < deepest[wi]) deepest[wi] = z;
+        hasTop[wi] = 1;
+        if (!shown(wi)) continue;
+        pts.push(W.x[wi], W.y[wi], z);
+      }
       if (!pts.length) return;
       var g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
@@ -1836,35 +1882,32 @@ function gossansStrata() {
     // key is that formation's index, or "none" for a well completed in
     // something this view does not draw or with nothing on file at all.
     var byProd = {};
-    function bucket(w) {
-      var k = (w.prod && w.prod.length) ? w.prod[0] : "none";
+    function bucket(wi) {
+      var k = W.prod[wi] >= 0 ? W.prod[wi] : "none";
       if (!byProd[k]) byProd[k] = { surveyed: [], vertical: [] };
       return byProd[k];
     }
-    wells.forEach(function (w) {
-      var surveyed = bucket(w).surveyed, vertical = bucket(w).vertical;
-      if (w.surveyed && w.path) {
-        for (var i = 1; i < w.path.length; i++) {
-          surveyed.push(w.path[i - 1][0], w.path[i - 1][1], w.path[i - 1][2]);
-          surveyed.push(w.path[i][0], w.path[i][1], w.path[i][2]);
+    for (var wi = 0; wi < nW; wi++) {
+      if (!shown(wi)) continue;
+      var b = bucket(wi), x = W.x[wi], y = W.y[wi], gnd = W.ground[wi];
+      if (hasPath[wi]) {
+        var P = pathOf[wi];
+        for (var i = 3; i < P.length; i += 3) {
+          b.surveyed.push(P[i - 3], P[i - 2], P[i - 1], P[i], P[i + 1], P[i + 2]);
         }
-        // Many surveys begin below the surface: 253 of them here, one as
-        // much as 4 km down, because only the lateral was surveyed. The
-        // stem up to the ground is drawn in the unsurveyed colour, because
-        // that is what it is.
-        if (w.ground !== undefined && w.ground - w.path[0][2] > 30)
-          vertical.push(w.x, w.y, w.ground, w.path[0][0], w.path[0][1], w.path[0][2]);
-      } else if (w.tops.length) {
-        var zs = w.tops.map(function (t) { return t[2]; }).filter(function (z) { return z !== null; });
-        if (zs.length < 1) return;
+        // Many surveys begin below the surface, some kilometres down,
+        // because only the lateral was surveyed. The stem up to the ground
+        // is drawn in the unsurveyed colour, because that is what it is.
+        if (gnd !== null && gnd - P[2] > 30)
+          b.vertical.push(x, y, gnd, P[0], P[1], P[2]);
+      } else if (hasTop[wi]) {
         // From the ground it was drilled from down to the deepest top filed
         // for it. Vertical over the whole length is an assumption, and the
         // colour and the text both say the survey is missing.
-        var bot = Math.min.apply(null, zs);
-        var top = (w.ground !== undefined) ? w.ground : Math.max.apply(null, zs);
-        vertical.push(w.x, w.y, top, w.x, w.y, bot);
+        var top = (gnd !== null) ? gnd : deepest[wi];
+        b.vertical.push(x, y, top, x, y, deepest[wi]);
       }
-    });
+    }
     var pairs = [];
     Object.keys(byProd).forEach(function (k) {
       pairs.push([byProd[k].surveyed, "#54606b", k]);
@@ -2091,8 +2134,8 @@ function gossansStrata() {
 
   function drawLegend() {
     legend.innerHTML = "";
-    var noneWells = data.wells.filter(function (w) {
-      return !(w.prod && w.prod.length); }).length;
+    var noneWells = 0;
+    data.wells.prod.forEach(function (pr) { if (pr < 0) noneWells++; });
 
     function row(colour, name, sub, on, toggle) {
       var b = document.createElement("button");
@@ -2109,19 +2152,50 @@ function gossansStrata() {
       legend.appendChild(b);
     }
 
-    data.formations.forEach(function (f, i) {
-      // Depth and picks were a separate diagram once. The well count is what
-      // the row also governs: switching it off takes the tops at that horizon
-      // and the wells completed in it together.
-      var sub = (f.median_depth_ft === undefined || f.median_depth_ft === null
-                 ? "" : f.median_depth_ft.toLocaleString() + " ft &middot; ") +
-                f.tops.toLocaleString() + " tops" +
-                (f.wells ? " &middot; " + f.wells.toLocaleString() + " producing" : "");
-      row(f.colour, f.name, sub, !hidden[i], function () {
-        hidden[i] = !hidden[i];
-        return !hidden[i];
+    function subline(depth, ntops, nwells) {
+      return (depth === undefined || depth === null
+              ? "" : depth.toLocaleString() + " ft &middot; ") +
+             ntops.toLocaleString() + " tops" +
+             (nwells ? " &middot; " + nwells.toLocaleString() + " producing" : "");
+    }
+
+    if (!combine) {
+      // Every name apart: BIG GEORGE LOWER is its own row, as filed.
+      data.formations.forEach(function (f, i) {
+        // Depth and picks were a separate diagram once. The well count is
+        // what the row also governs: switching it off takes the tops at
+        // that horizon and the wells completed in it together.
+        row(f.colour, f.name, subline(f.median_depth_ft, f.tops, f.wells),
+            !hidden[i], function () {
+              hidden[i] = !hidden[i];
+              return !hidden[i];
+            });
       });
-    });
+    } else {
+      // Names combined into the unit the evidence put them in. One switch
+      // governs every bench and spelling of it; the row says how many.
+      var units = [], byUnit = {};
+      data.formations.forEach(function (f, i) {
+        var u = f.unit || f.name;
+        if (!byUnit[u]) { byUnit[u] = []; units.push(u); }
+        byUnit[u].push(i);
+      });
+      units.forEach(function (u) {
+        var idx = byUnit[u], f0 = data.formations[idx[0]];
+        var ntops = 0, nwells = 0;
+        idx.forEach(function (i) {
+          ntops += data.formations[i].tops; nwells += data.formations[i].wells || 0;
+        });
+        var names = idx.length > 1 ? " &middot; " + idx.length + " names" : "";
+        var anyOn = idx.some(function (i) { return !hidden[i]; });
+        row(f0.colour, u, subline(f0.median_depth_ft, ntops, nwells) + names,
+            anyOn, function () {
+              var on = !idx.some(function (i) { return !hidden[i]; });
+              idx.forEach(function (i) { hidden[i] = !on; });
+              return on;
+            });
+      });
+    }
 
     if (noneWells) {
       row("#8a9098", "No producing formation filed",

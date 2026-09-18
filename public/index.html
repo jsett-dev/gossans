@@ -793,7 +793,7 @@ header.plate { padding: 40px 0 0; }
 
     <div class="titleblock">
       <div><dt>For</dt>Mineral and royalty owners, and the trusts, estates and funds that hold them</div>
-      <div><dt>Area</dt>Powder River Basin, Wyoming. Converse and Campbell counties, by section, township and range</div>
+      <div><dt>Area</dt>Powder River Basin, Wyoming and Montana, by section, township and range. Every well in both states is held</div>
       <div><dt>Built on</dt>The state's own public filings. Production, directional surveys, completions, logs</div>
       <div><dt>Status</dt>Research. Not yet trading, and no services are offered on this site</div>
     </div>
@@ -820,12 +820,12 @@ header.plate { padding: 40px 0 0; }
 
     <div class="proof">
       <div>
-        <div class="fig">228,619</div>
-        <div class="cap">Directional survey stations held and processed, across 6,450 filings. Enough to walk a horizontal lateral section by section and quote back how many feet of it the operator&rsquo;s own filed survey places under your section, rather than take the allocation on trust.</div>
+        <div class="fig" data-count="survey_stations">228,619</div>
+        <div class="cap">Directional survey stations held and processed, across <span data-count="survey_files">6,450</span> filings. Enough to walk a horizontal lateral section by section and quote back how many feet of it the operator&rsquo;s own filed survey places under your section, rather than take the allocation on trust.</div>
       </div>
       <div>
-        <div class="fig">277,836</div>
-        <div class="cap">Months of reported production, well by well. Every decline curve here is fitted to what the well actually did, and shown against it, not drawn from a type curve and asserted.</div>
+        <div class="fig" data-count="well_production">277,836</div>
+        <div class="cap">Months of reported production, well by well, for <span data-count="wells">2,570</span> wells in Wyoming and Montana. Every decline curve here is fitted to what the well actually did, and shown against it, not drawn from a type curve and asserted.</div>
       </div>
       <div>
         <div class="fig">Nothing</div>
@@ -913,9 +913,10 @@ header.plate { padding: 40px 0 0; }
         owner rather than at the buyer.
       </p>
       <p>
-        That gap is where this started. We hold 2,570 wells, 277,836
-        months of production and 228,619 survey stations for the Powder River
-        Basin, indexed by section, township and range. From that we can tell
+        That gap is where this started. We hold <span data-count="wells">2,570</span> wells,
+        <span data-count="well_production">277,836</span> months of production and
+        <span data-count="survey_stations">228,619</span> survey stations across Wyoming
+        and Montana, indexed by section, township and range. From that we can tell
         you which wells actually run under your tract and for how many feet,
         what they have reported producing, how that production has behaved, and
         what has been permitted, drilled or left alone around them. Then we
@@ -948,9 +949,11 @@ header.plate { padding: 40px 0 0; }
         </p>
         <p>
           Until those come back, this site is the work rather than an offer.
-          Everything on it is built from Wyoming's own public filings: 2,570
-          wells, 277,836 months of reported production, 228,619 directional
-          survey stations and 531,535 formation tops. The study, the basin
+          Everything on it is built from public filings in Wyoming and Montana:
+          <span data-count="wells">2,570</span> wells,
+          <span data-count="well_production">277,836</span> months of reported production,
+          <span data-count="survey_stations">228,619</span> directional survey stations and
+          <span data-count="formation_tops">531,535</span> formation tops. The study, the basin
           model and the decline fitter all run on that, and they are here so
           the work can be judged before anybody is asked to pay for it.
         </p>
@@ -1324,6 +1327,23 @@ convert tail to gas lift      cost <b>$2.4M</b>   risked <b>&minus;$2.4M</b>   w
       : window.matchMedia("(prefers-color-scheme: dark)").matches;
     root.setAttribute("data-theme", dark ? "light" : "dark");
   });
+})();
+</script>
+
+<script>
+// The counts on this page are read from the store's inventory, so the page
+// says what is held today rather than what was held when it was written.
+// The numbers in the markup are the fallback if the inventory cannot load.
+(function () {
+  fetch("/data/inventory.json").then(function (r) { return r.json(); }).then(function (d) {
+    var rows = {};
+    (d.tables || []).forEach(function (t) { rows[t.table] = t.rows; });
+    rows.wells = d.wells;
+    document.querySelectorAll("[data-count]").forEach(function (el) {
+      var v = rows[el.getAttribute("data-count")];
+      if (typeof v === "number") el.textContent = v.toLocaleString();
+    });
+  }).catch(function () {});
 })();
 </script>
 </body>
